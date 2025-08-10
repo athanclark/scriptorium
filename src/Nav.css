@@ -1,0 +1,15 @@
+.nav {
+  display: grid;
+}
+
+.nav > * {
+  grid-area: 1 / 1;
+}
+
+.nav > :first-child {
+  z-index: 1;
+}
+
+.nav > :nth-child(2) {
+  z-index: 10000;
+}
