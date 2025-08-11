@@ -72,6 +72,39 @@ ALTER TABLE documents ADD COLUMN icon TEXT;
 ALTER TABLE documents ADD COLUMN icon_color TEXT;
 ",
         },
+        Migration {
+            version: 5,
+            description: "auto_modify_datetime",
+            kind: MigrationKind::Up,
+            sql: "
+CREATE TRIGGER update_modified_books
+AFTER UPDATE ON books
+FOR EACH ROW
+BEGIN
+    UPDATE books
+    SET modified = datetime('now')
+    WHERE id = NEW.id;
+END;
+CREATE TRIGGER update_modified_documents
+AFTER UPDATE ON documents
+FOR EACH ROW
+BEGIN
+    UPDATE documents
+    SET modified = datetime('now')
+    WHERE id = NEW.id;
+END;
+",
+        },
+        Migration {
+            version: 6,
+            description: "trash",
+            kind: MigrationKind::Up,
+            sql: "
+ALTER TABLE books ADD COLUMN trash INTEGER NOT NULL DEFAULT 0
+CHECK (trash IN (0, 1));
+INSERT OR IGNORE INTO books (id, name) VALUES ('trash', 'Trash');
+",
+        },
     ];
 
     tauri::Builder::default()
