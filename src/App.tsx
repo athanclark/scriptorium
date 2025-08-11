@@ -1,6 +1,6 @@
-import Editor from "./Editor";
 import Nav from "./Nav";
-import { useState } from "react";
+import Document from "./Document";
+import { useState, useEffect } from "react";
 import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import { AppShell, Burger, Button, TextInput, Typography, Drawer } from "@mantine/core";
@@ -12,8 +12,8 @@ import "@mantine/notifications/styles.css";
 function App() {
   // const [greetMsg, setGreetMsg] = useState("");
   // const [name, setName] = useState("");
-  const [doc, setDoc] = useState("");
-  const [docName, setDocName] = useState("");
+  const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
+  const [reloadNav, setReloadNav] = useState(false);
   const [opened, { toggle }] = useDisclosure();
 
   // async function greet() {
@@ -41,17 +41,33 @@ function App() {
         <div>Scriptorium</div>
       </AppShell.Header>
 
-      <AppShell.Navbar><Nav onSelectDocument={(d) => console.log(d)} /></AppShell.Navbar>
+      <AppShell.Navbar>
+        <Nav onSelectDocument={setSelectedDoc} reload={reloadNav} />
+      </AppShell.Navbar>
 
       <AppShell.Main>
-        <TextInput
-          value={docName}
-          onChange={(event) => setDocName(event.currentTarget.value)}
-          label="Document Name"
-        />
-        <Editor value={doc} setValue={setDoc} />
+        {
+          selectedDoc
+            ? <Document
+              doc={selectedDoc}
+              onUpdateDocument={() => setReloadNav(!reloadNav)}
+              onDeleteDocument={() => {
+                setSelectedDoc(null);
+                setReloadNav(!reloadNav);
+              }}
+            />
+            : <Info />
+        }
       </AppShell.Main>
     </AppShell>
+  );
+}
+
+function Info() {
+  return (
+    <Typography>
+      <p>Select or create a Document to begin taking notes. Documents live inside Books.</p>
+    </Typography>
   );
 }
 

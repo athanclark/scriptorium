@@ -1,5 +1,4 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import { NativeSelect, Typography, Tabs, Textarea } from "@mantine/core";
 import { IconEdit, IconEye } from "@tabler/icons-react";
@@ -13,20 +12,21 @@ import "highlight.js/styles/github.css";
 type EditorProps = {
   value: string;
   setValue: React.Dispatch<React.SetStateAction<string>>;
+  syntax: Syntax;
+  setSyntax: React.Dispatch<React.SetStateAction<Syntax>>;
 };
 
-type EditorType = "md" | "adoc" | "html";
+export type Syntax = "md" | "adoc" | "html";
 
-function Editor({ value, setValue }: EditorProps) {
-  const [editorType, setEditorType] = useState("md");
-
+function Editor({ value, setValue, syntax, setSyntax }: EditorProps) {
   return (
     <>
       <NativeSelect
         label="Document Syntax"
-        value={editorType}
+        value={syntax}
         onChange={(event) => {
-          setEditorType(event.currentTarget.selectedOptions[0].value);
+          const newSyntax = event.currentTarget.selectedOptions[0].value;
+          setSyntax(newSyntax);
         }}
         data={[
           {label: "Markdown", value: "md"},
@@ -40,10 +40,10 @@ function Editor({ value, setValue }: EditorProps) {
           <Tabs.Tab value="view" leftSection={<IconEye size={12} />}>View</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="edit">
-          <Edit value={value} setValue={setValue} editorType={editorType} />
+          <Edit value={value} setValue={setValue} syntax={syntax} />
         </Tabs.Panel>
         <Tabs.Panel value="view">
-          <View value={value} editorType={editorType} />
+          <View value={value} syntax={syntax} />
         </Tabs.Panel>
       </Tabs>
     </>
@@ -53,10 +53,10 @@ function Editor({ value, setValue }: EditorProps) {
 type EditProps = {
   value: string;
   setValue: React.Dispatch<React.SetStateAction<string>>;
-  editorType: EditorType;
+  syntax: Syntax;
 };
 
-function Edit({ value, setValue, editorType }: EditProps) {
+function Edit({ value, setValue, syntax }: EditProps) {
   return (
     <Textarea
       autosize
@@ -70,18 +70,17 @@ function Edit({ value, setValue, editorType }: EditProps) {
 
 type ViewProps = {
   value: string;
-  editorType: EditorType;
+  syntax: Syntax;
 };
 
 const asciidoctor = Asciidoctor();
 
-function View({ value, editorType }: ViewProps) {
-  console.log("viewing", value, editorType);
-  const renderedValue = editorType === "md"
+function View({ value, syntax }: ViewProps) {
+  const renderedValue = syntax === "md"
     ? (<ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{value}</ReactMarkdown>)
-    : editorType === "adoc"
+    : syntax === "adoc"
     ? (<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(asciidoctor.convert(value)) }} />)
-    : editorType === "html"
+    : syntax === "html"
     ? (<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(value) }} />)
     : (<span>Editor Type Not Supported</span>);
   return (

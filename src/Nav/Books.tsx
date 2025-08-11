@@ -1,0 +1,73 @@
+import { __LOCAL_DB } from "../consts";
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import Database from "@tauri-apps/plugin-sql";
+import { Button, Title, NavLink, Loader, Anchor, Transition, TextInput, ColorInput, Typography, Modal } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import { IconArrowLeft, IconPlus } from '@tabler/icons-react';
+
+type Book = {
+  id: string;
+  name: string;
+  icon: string | null;
+  iconColor: string | null;
+};
+
+type BooksProps = {
+  onSelectBook: React.Dispatch<React.SetStateAction<string>>;
+  reload: bool;
+};
+
+function Books({ onSelectBook, reload }: BooksProps) {
+  const [books, setBooks] = useState<Book[] | null>(null);
+
+  useEffect(() => {
+    async function go() {
+      try {
+        const db = await Database.load(__LOCAL_DB);
+        const bs = await db.select<Book>("SELECT id, name, icon, icon_color AS iconColor FROM books");
+        setBooks(bs);
+      } catch(e) {
+        console.error("Fetching Books Failed", e);
+      }
+    }
+    go();
+  }, [reload]);
+
+  const renderedBooks = books
+    ? books.map(b => {
+      const iconStyles = b.iconColor ? {backgroundColor: b.iconColor} : {};
+      const icon = b.icon ? (<span style={iconStyles}>{b.icon}</span>) : null;
+      return (<NavLink
+        key={b.id}
+        href="#"
+        label={b.name}
+        leftSection={icon}
+        onClick={() => onSelectBook(b.id)}
+      />);
+    })
+    : (<Loader color="blue" />);
+
+  function newBook() {
+    async function go() {
+      try {
+        const db = await Database.load(__LOCAL_DB);
+        const res = await db.select<{ id: string }>("INSERT INTO books (name) VALUES ('') RETURNING id");
+        onSelectBook(res[0].id);
+      } catch(e) {
+        console.error("Fetching Books Failed", e);
+      }
+    }
+    go();
+  }
+
+  return (
+    <>
+      <Title order={3}>Books</Title>
+      <Button leftSection={<IconPlus size={14} />} fullWidth onClick={newBook}>New Book</Button>
+      { renderedBooks }
+    </>
+  );
+}
+
+export default Books;
