@@ -11,29 +11,34 @@ import "./Nav.css";
 
 type NavProps = {
   onSelectDocument: React.Dispatch<React.SetStateAction<string>>;
+  onChangeBooks: () => void;
   reload: bool;
 };
 
-function Nav({ onSelectDocument, reload }: NavProps) {
+function Nav({ onSelectDocument, onChangeBooks, reload }: NavProps) {
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
+  const [bookIsSelected, setBookIsSelected] = useState<boolean>(false);
   const [reloadBooks, setReloadBooks] = useState(false);
 
   return (
     <div className="nav">
       <Transition
-        mounted={!selectedBook}
+        mounted={!bookIsSelected}
         transition="fade-left"
         duration={400}
         timingFunction="ease">
         {(styles) => <div style={styles}>
           <Books
-            onSelectBook={setSelectedBook}
+            onSelectBook={(b) => {
+              setSelectedBook(b);
+              setBookIsSelected(true);
+            }}
             reload={reloadBooks}
           />
         </div>}
       </Transition>
       <Transition
-        mounted={!!selectedBook}
+        mounted={bookIsSelected}
         transition="fade-left"
         duration={400}
         timingFunction="ease">
@@ -43,7 +48,11 @@ function Nav({ onSelectDocument, reload }: NavProps) {
             onSelectDocument={onSelectDocument}
             reload={reload}
             goBack={() => {
-              setSelectedBook(null);
+              onChangeBooks();
+              setBookIsSelected(false);
+              setTimeout(() => {
+                setSelectedBook(null);
+              }, 500);
               setReloadBooks(!reloadBooks);
             }}
           />

@@ -2,13 +2,14 @@ import { __LOCAL_DB } from "../consts";
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import Database from "@tauri-apps/plugin-sql";
-import { Button, Title, NavLink, Loader, Anchor, Transition, TextInput, ColorInput, Typography, Modal } from "@mantine/core";
+import { Button, Title, NavLink, Loader, Anchor, Transition, TextInput, ColorInput, Typography, Modal, Divider } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconArrowLeft, IconPlus } from '@tabler/icons-react';
 
-type Book = {
+export type Book = {
   id: string;
   name: string;
+  trash: number | boolean;
   icon: string | null;
   iconColor: string | null;
 };
@@ -20,13 +21,19 @@ type BooksProps = {
 
 function Books({ onSelectBook, reload }: BooksProps) {
   const [books, setBooks] = useState<Book[] | null>(null);
+  const [trashes, setTrashes] = useState<Book[] | null>(null);
 
   useEffect(() => {
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
-        const bs = await db.select<Book>("SELECT id, name, icon, icon_color AS iconColor FROM books");
-        setBooks(bs);
+        const bs = await db.select<Book>("SELECT id, name, trash, icon, icon_color AS iconColor FROM books WHERE id <> 'trash' AND trash = 0 ORDER BY name ASC");
+        const ts = await db.select<Book>("SELECT id, name, trash, icon, icon_color AS iconColor FROM books WHERE id <> 'trash' AND trash = 1 ORDER BY name ASC");
+        const res = await db.select<Book>("SELECT id, name, trash, icon, icon_color AS iconColor FROM books WHERE id = 'trash'");
+        const bs_ = bs.map(b => ({ ...b, trash: b.trash === 1 }));
+        setBooks(bs_);
+        const ts_ = [ ...ts, res[0] ].map(b => ({ ...b, trash: b.trash === 1 }));
+        setTrashes(ts_);
       } catch(e) {
         console.error("Fetching Books Failed", e);
       }
@@ -34,18 +41,26 @@ function Books({ onSelectBook, reload }: BooksProps) {
     go();
   }, [reload]);
 
+  function renderBookListing(b) {
+    const iconStyles = b.iconColor ? {backgroundColor: b.iconColor} : {};
+    const icon = b.icon ? (<span style={iconStyles}>{b.icon}</span>) : null;
+    return (<NavLink
+      key={b.id}
+      href="#"
+      label={b.name}
+      leftSection={icon}
+      color={b.trash ? "gray" : ""}
+      active={b.trash}
+      onClick={() => onSelectBook(b.id)}
+    />);
+  }
+
   const renderedBooks = books
-    ? books.map(b => {
-      const iconStyles = b.iconColor ? {backgroundColor: b.iconColor} : {};
-      const icon = b.icon ? (<span style={iconStyles}>{b.icon}</span>) : null;
-      return (<NavLink
-        key={b.id}
-        href="#"
-        label={b.name}
-        leftSection={icon}
-        onClick={() => onSelectBook(b.id)}
-      />);
-    })
+    ? [ 
+      ...books.map(renderBookListing),
+      <Divider key="divider" my="xs" label="Trashes" labelPosition="center" />,
+      ...trashes.map(renderBookListing),
+    ]
     : (<Loader color="blue" />);
 
   function newBook() {

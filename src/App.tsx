@@ -14,6 +14,7 @@ function App() {
   // const [name, setName] = useState("");
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
   const [reloadNav, setReloadNav] = useState(false);
+  const [reloadDoc, setReloadDoc] = useState(false);
   const [opened, { toggle }] = useDisclosure();
 
   // async function greet() {
@@ -42,7 +43,11 @@ function App() {
       </AppShell.Header>
 
       <AppShell.Navbar>
-        <Nav onSelectDocument={setSelectedDoc} reload={reloadNav} />
+        <Nav
+          onSelectDocument={setSelectedDoc}
+          onChangeBooks={() => setReloadDoc(!reloadDoc)}
+          reload={reloadNav}
+        />
       </AppShell.Navbar>
 
       <AppShell.Main>
@@ -50,6 +55,7 @@ function App() {
           selectedDoc
             ? <Document
               doc={selectedDoc}
+              reload={reloadDoc}
               onUpdateDocument={() => setReloadNav(!reloadNav)}
               onDeleteDocument={() => {
                 setSelectedDoc(null);

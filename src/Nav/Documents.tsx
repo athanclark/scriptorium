@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import Database from "@tauri-apps/plugin-sql";
 import { Button, Title, NavLink, Loader, Anchor, Transition, TextInput, ColorInput, Typography, Modal } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { IconArrowLeft, IconPlus } from '@tabler/icons-react';
+import { IconArrowLeft, IconPlus, IconTrash, IconRecycle, IconAlertTriangle } from '@tabler/icons-react';
 
 type Document = {
   id: string,
@@ -26,18 +26,21 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
   const [bookName, setBookName] = useState<string>("");
   const [bookIcon, setBookIcon] = useState<string | null>(null)
   const [bookIconColor, setBookIconColor] = useState<string | null>("");
+  const [bookTrash, setBookTrash] = useState<boolean | null>(null);
   const [openedDeleteBook, { open: openDeleteBook, close: closeDeleteBook }] = useDisclosure();
+  const [openedTrashBook, { open: openTrashBook, close: closeTrashBook }] = useDisclosure();
 
-  function reload() {
+  function actuallyReload() {
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
         const bs = await db.select<Document>("SELECT id, name, icon, icon_color AS iconColor FROM documents WHERE book = $1", [book]);
         setDocuments(bs);
-        const res = await db.select<Document>("SELECT name, icon, icon_color AS iconColor FROM books WHERE id = $1", [book]);
-        setBookName(res[0].name)
-        setBookIcon(res[0].icon)
-        setBookIconColor(res[0].iconColor)
+        const res = await db.select<Document>("SELECT name, icon, trash, icon_color AS iconColor FROM books WHERE id = $1", [book]);
+        setBookName(res[0].name);
+        setBookIcon(res[0].icon);
+        setBookIconColor(res[0].iconColor);
+        setBookTrash(res[0].trash);
       } catch(e) {
         console.error("Fetching documents Failed", e);
       }
@@ -46,7 +49,7 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
   }
 
   useEffect(() => {
-    reload();
+    actuallyReload();
   }, [book, reload]);
 
   const renderedDocuments = documents
@@ -110,6 +113,33 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
         closeDeleteBook();
         goBack();
       } catch(e) {
+        console.error("Deleting Book Failed", e);
+      }
+    }
+    go();
+  }
+
+  function trashBook() {
+    async function go() {
+      try {
+        const db = await Database.load(__LOCAL_DB);
+        await db.execute("UPDATE books SET trash = 1 WHERE id = $1", [book]);
+        closeTrashBook();
+        goBack();
+      } catch(e) {
+        console.error("Updating Book Failed", e);
+      }
+    }
+    go();
+  }
+
+  function restoreBook() {
+    async function go() {
+      try {
+        const db = await Database.load(__LOCAL_DB);
+        await db.execute("UPDATE books SET trash = 0 WHERE id = $1", [book]);
+        goBack();
+      } catch(e) {
         console.error("Updating Book Failed", e);
       }
     }
@@ -132,6 +162,10 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
 
   return (
     <>
+      <Modal opened={openedTrashBook} onClose={closeTrashBook} title="Throw Away This Book?">
+        <Typography>Are you sure you want to put {bookName} in the trash? It can be undone later.</Typography>
+        <Button color="red" onClick={trashBook}>Trash {bookName}</Button>
+      </Modal>
       <Modal opened={openedDeleteBook} onClose={closeDeleteBook} title="Delete Book?">
         <Title order={1}>Are you sure you want to delete {bookName}?</Title>
         <Typography>
@@ -140,13 +174,25 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
         <Button color="red" onClick={deleteBook}>Delete {bookName}</Button>
       </Modal>
       <Anchor href="#" onClick={goBack}><IconArrowLeft size={12} /> All Books</Anchor>
-      <TextInput label="Book Name" value={bookName} onChange={(event) => changeBookName(event.currentTarget.value)} />
+      <TextInput key="name" label="Book Name" value={bookName} onChange={(event) => changeBookName(event.currentTarget.value)} />
       <TextInput label="Book Icon" value={bookIcon || ""} onChange={(event) => changeBookIcon(event.currentTarget.value)} />
       <ColorInput label="Book Icon Color" value={bookIconColor || ""} onChangeEnd={(c) => changeBookIconColor(c)} />
       <Title order={3}>Documents</Title>
-      <Button leftSection={<IconPlus size={14} />} fullWidth onClick={newDocument}>New Document</Button>
+      {
+        !(book === "trash") && (
+          bookTrash
+            ? (<Button leftSection={<IconRecycle size={14} />} fullWidth onClick={restoreBook}>Restore Book</Button>)
+            : (<Button leftSection={<IconPlus size={14} />} fullWidth onClick={newDocument}>New Document</Button>)
+        )
+      }
       { renderedDocuments }
-      <Button color="red" fullWidth onClick={() => openDeleteBook()}>Delete Book</Button>
+      {
+        !(book === "trash") && (
+          bookTrash
+            ? (<Button leftSection={<IconAlertTriangle size={14} />} color="red" fullWidth onClick={openDeleteBook}>Delete Book</Button>)
+            : (<Button leftSection={<IconTrash size={14} />} color="red" fullWidth onClick={openTrashBook}>Trash Book</Button>)
+        )
+      }
     </>
   );
 }

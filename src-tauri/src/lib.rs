@@ -105,6 +105,43 @@ CHECK (trash IN (0, 1));
 INSERT OR IGNORE INTO books (id, name) VALUES ('trash', 'Trash');
 ",
         },
+        Migration {
+            version: 7,
+            description: "permanently_deleted",
+            kind: MigrationKind::Up,
+            sql: "
+CREATE TABLE IF NOT EXISTS deleted (
+    id TEXT PRIMARY KEY
+);
+",
+        },
+        Migration {
+            version: 8,
+            description: "make_sure_trash_actually_is_trash",
+            kind: MigrationKind::Up,
+            sql: "
+UPDATE books SET trash = 1 WHERE id = 'trash';
+",
+        },
+        Migration {
+            version: 9,
+            description: "delete_trigger_for_permanently_deleted",
+            kind: MigrationKind::Up,
+            sql: "
+CREATE TRIGGER populate_deleted_book
+AFTER DELETE ON books
+FOR EACH ROW
+BEGIN
+    INSERT INTO deleted (id) VALUES (OLD.id);
+END;
+CREATE TRIGGER populate_deleted_document
+AFTER DELETE ON documents
+FOR EACH ROW
+BEGIN
+    INSERT INTO deleted (id) VALUES (OLD.id);
+END;
+",
+        },
     ];
 
     tauri::Builder::default()
