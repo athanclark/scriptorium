@@ -1,8 +1,9 @@
 import { __LOCAL_DB } from "../consts";
+import { otherColor, iconBackgroundStyles } from "../colors";
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import Database from "@tauri-apps/plugin-sql";
-import { Button, Title, NavLink, Loader, Anchor, Transition, TextInput, ColorInput, Typography, Modal, Divider } from "@mantine/core";
+import { Button, Title, NavLink, Loader, Anchor, Transition, TextInput, ColorInput, Typography, Modal, Divider, Stack } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconArrowLeft, IconPlus } from '@tabler/icons-react';
 
@@ -42,7 +43,8 @@ function Books({ onSelectBook, reload }: BooksProps) {
   }, [reload]);
 
   function renderBookListing(b) {
-    const iconStyles = b.iconColor ? {backgroundColor: b.iconColor} : {};
+    const bg = b.iconColor ? `linear-gradient(45deg, ${b.iconColor}, ${otherColor(b.iconColor)})` : "";
+    const iconStyles = b.iconColor ? { ...iconBackgroundStyles, background: bg} : {};
     const icon = b.icon ? (<span style={iconStyles}>{b.icon}</span>) : null;
     return (<NavLink
       key={b.id}
@@ -77,11 +79,13 @@ function Books({ onSelectBook, reload }: BooksProps) {
   }
 
   return (
-    <>
+    <Stack>
       <Title order={3}>Books</Title>
       <Button leftSection={<IconPlus size={14} />} fullWidth onClick={newBook}>New Book</Button>
-      { renderedBooks }
-    </>
+      <div>
+        { renderedBooks }
+      </div>
+    </Stack>
   );
 }
 

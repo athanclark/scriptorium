@@ -1,10 +1,13 @@
 import { __LOCAL_DB } from "../consts";
+import { otherColor, iconBackgroundStyles, swatches } from "../colors";
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import Database from "@tauri-apps/plugin-sql";
-import { Button, Title, NavLink, Loader, Anchor, Transition, TextInput, ColorInput, Typography, Modal } from "@mantine/core";
+import { Button, Title, NavLink, Loader, Anchor, Transition, TextInput, ColorInput, Typography, Modal, Stack } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconArrowLeft, IconPlus, IconTrash, IconRecycle, IconAlertTriangle } from '@tabler/icons-react';
+import data from "@emoji-mart/data";
+import Picker from "@emoji-mart/react";
 
 type Document = {
   id: string,
@@ -29,6 +32,7 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
   const [bookTrash, setBookTrash] = useState<boolean | null>(null);
   const [openedDeleteBook, { open: openDeleteBook, close: closeDeleteBook }] = useDisclosure();
   const [openedTrashBook, { open: openTrashBook, close: closeTrashBook }] = useDisclosure();
+  const [openedEmojiPicker, { open: openEmojiPicker, close: closeEmojiPicker }] = useDisclosure();
 
   function actuallyReload() {
     async function go() {
@@ -54,7 +58,8 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
 
   const renderedDocuments = documents
     ? documents.map(d => {
-      const iconStyles = d.iconColor ? {backgroundColor: d.iconColor} : {};
+      const bg = d.iconColor ? `linear-gradient(45deg, ${d.iconColor}, ${otherColor(d.iconColor)})` : "";
+      const iconStyles = d.iconColor ? { ...iconBackgroundStyles, background: bg} : {};
       const icon = d.icon ? (<span style={iconStyles}>{d.icon}</span>) : null;
       return (<NavLink
         key={d.id}
@@ -173,26 +178,35 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
         </Typography>
         <Button color="red" onClick={deleteBook}>Delete {bookName}</Button>
       </Modal>
-      <Anchor href="#" onClick={goBack}><IconArrowLeft size={12} /> All Books</Anchor>
-      <TextInput key="name" label="Book Name" value={bookName} onChange={(event) => changeBookName(event.currentTarget.value)} />
-      <TextInput label="Book Icon" value={bookIcon || ""} onChange={(event) => changeBookIcon(event.currentTarget.value)} />
-      <ColorInput label="Book Icon Color" value={bookIconColor || ""} onChangeEnd={(c) => changeBookIconColor(c)} />
-      <Title order={3}>Documents</Title>
-      {
-        !(book === "trash") && (
-          bookTrash
-            ? (<Button leftSection={<IconRecycle size={14} />} fullWidth onClick={restoreBook}>Restore Book</Button>)
-            : (<Button leftSection={<IconPlus size={14} />} fullWidth onClick={newDocument}>New Document</Button>)
-        )
-      }
-      { renderedDocuments }
-      {
-        !(book === "trash") && (
-          bookTrash
-            ? (<Button leftSection={<IconAlertTriangle size={14} />} color="red" fullWidth onClick={openDeleteBook}>Delete Book</Button>)
-            : (<Button leftSection={<IconTrash size={14} />} color="red" fullWidth onClick={openTrashBook}>Trash Book</Button>)
-        )
-      }
+      <Modal opened={openedEmojiPicker} onClose={closeEmojiPicker} title="Pick Icon">
+        <Picker data={data} onEmojiSelect={emoji => {
+          changeBookIcon(emoji.native);
+          closeEmojiPicker();
+        }} />
+      </Modal>
+      <Stack>
+        <Anchor href="#" onClick={goBack}><IconArrowLeft size={12} /> All Books</Anchor>
+        <Button fullWidth variant="default" onClick={openEmojiPicker} leftSection={<span>{bookIcon}</span>}>Change Icon</Button>
+        <ColorInput label="Book Icon Color" swatches={swatches} value={bookIconColor || ""} onChangeEnd={(c) => changeBookIconColor(c)} />
+        <Title order={3}>Documents</Title>
+        {
+          !(book === "trash") && (
+            bookTrash
+              ? (<Button leftSection={<IconRecycle size={14} />} fullWidth onClick={restoreBook}>Restore Book</Button>)
+              : (<Button leftSection={<IconPlus size={14} />} fullWidth onClick={newDocument}>New Document</Button>)
+          )
+        }
+        <div>
+          { renderedDocuments }
+        </div>
+        {
+          !(book === "trash") && (
+            bookTrash
+              ? (<Button leftSection={<IconAlertTriangle size={14} />} color="red" fullWidth onClick={openDeleteBook}>Delete Book</Button>)
+              : (<Button leftSection={<IconTrash size={14} />} color="red" fullWidth onClick={openTrashBook}>Trash Book</Button>)
+          )
+        }
+      </Stack>
     </>
   );
 }

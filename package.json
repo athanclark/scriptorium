@@ -10,6 +10,8 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@emoji-mart/data": "^1.2.1",
+    "@emoji-mart/react": "^1.1.1",
     "@mantine/core": "^8.2.4",
     "@mantine/hooks": "^8.2.4",
     "@mantine/notifications": "^8.2.4",
@@ -20,6 +22,7 @@
     "asciidoctor": "^3.0.4",
     "dompurify": "^3.2.6",
     "highlight.js": "^11.11.1",
+    "polished": "^4.3.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
