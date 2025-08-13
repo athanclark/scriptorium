@@ -32,7 +32,8 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument }: DocumentP
   const [openedTrashDocument, { open: openTrashDocument, close: closeTrashDocument }] = useDisclosure();
   const [openedEmojiPicker, { open: openEmojiPicker, close: closeEmojiPicker }] = useDisclosure();
 
-  function reload() {
+  function actuallyReload() {
+    console.log('reloading document');
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
@@ -53,7 +54,7 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument }: DocumentP
   }
 
   useEffect(() => {
-    reload();
+    actuallyReload();
   }, [doc, reload]);
 
   function changeDocumentName(newDocumentName: string) {
@@ -220,7 +221,7 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument }: DocumentP
           <Button fullWidth variant="default" onClick={openEmojiPicker} leftSection={<span>{icon}</span>}>Change Icon</Button>
         </Grid.Col>
         <Grid.Col span={{base: 12, md: 6, lg: 4}}>
-          <ColorInput label="Document Icon Color" swatches={swatches} value={iconColor || ""} onChangeEnd={(c) => changeDocumentIconColor(c)} />
+          <ColorInput swatches={swatches} value={iconColor || ""} onChangeEnd={(c) => changeDocumentIconColor(c)} />
         </Grid.Col>
         <Grid.Col span={{base: 12, lg: 4}}>
           <Button fullWidth variant="default" onClick={openMoveDocument}>Move Document</Button>

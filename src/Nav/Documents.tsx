@@ -186,6 +186,7 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
       </Modal>
       <Stack>
         <Anchor href="#" onClick={goBack}><IconArrowLeft size={12} /> All Books</Anchor>
+        <TextInput label="Book Name" value={bookName} onChange={e => changeBookName(e.currentTarget.value)} />
         <Button fullWidth variant="default" onClick={openEmojiPicker} leftSection={<span>{bookIcon}</span>}>Change Icon</Button>
         <ColorInput label="Book Icon Color" swatches={swatches} value={bookIconColor || ""} onChangeEnd={(c) => changeBookIconColor(c)} />
         <Title order={3}>Documents</Title>

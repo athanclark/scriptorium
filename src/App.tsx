@@ -3,8 +3,9 @@ import Document from "./Document";
 import { useState, useEffect } from "react";
 import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
-import { AppShell, Burger, Button, TextInput, Typography, Drawer } from "@mantine/core";
+import { AppShell, Burger, Button, TextInput, Typography, Drawer, ActionIcon, Modal, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
+import { IconSettings, IconPlus } from "@tabler/icons-react";
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 // import "./App.css";
@@ -16,6 +17,7 @@ function App() {
   const [reloadNav, setReloadNav] = useState(false);
   const [reloadDoc, setReloadDoc] = useState(false);
   const [opened, { toggle }] = useDisclosure();
+  const [openedSettings, { open: openSettings, close: closeSettings }] = useDisclosure();
 
   // async function greet() {
   //   // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -33,13 +35,19 @@ function App() {
       }}
     >
       <AppShell.Header>
-        <Burger
-          opened={opened}
-          onClick={toggle}
-          hiddenFrom="sm"
-          size="sm"
-        />
-        <div>Scriptorium</div>
+        <div style={{display: "flex", justifyContent: "space-between"}}>
+          <Modal opened={openedSettings} onClose={closeSettings} title="Settings" size="auto">
+            <Settings />
+          </Modal>
+          <Burger
+            opened={opened}
+            onClick={toggle}
+            hiddenFrom="sm"
+            size="sm"
+          />
+          <div>Scriptorium</div>
+          <ActionIcon onClick={openSettings} variant="transparent" color="black" aria-label="Settings"><IconSettings /></ActionIcon>
+        </div>
       </AppShell.Header>
 
       <AppShell.Navbar>
@@ -77,39 +85,35 @@ function Info() {
   );
 }
 
-export default App;
+function Settings() {
+  return (
+    <Stack>
+      <Title order={2}>Remote Servers</Title>
+      <Grid>
+        <Grid.Col span={2}>
+          <NativeSelect label="Database Type" data={["MySQL", "PostgreSQL"]} />
+        </Grid.Col>
+        <Grid.Col span={2}>
+          <TextInput label="Host" />
+        </Grid.Col>
+        <Grid.Col span={1}>
+          <NumberInput label="Port" />
+        </Grid.Col>
+        <Grid.Col span={2}>
+          <TextInput label="Database" />
+        </Grid.Col>
+        <Grid.Col span={2}>
+          <TextInput label="Username" />
+        </Grid.Col>
+        <Grid.Col span={2}>
+          <PasswordInput label="Password" />
+        </Grid.Col>
+        <Grid.Col span={1} style={{display: "flex", alignItems: "center", justifyContent: "space-around"}}>
+          <ActionIcon><IconPlus /></ActionIcon>
+        </Grid.Col>
+      </Grid>
+    </Stack>
+  );
+}
 
-//        <Typography>
-//          <h1>Welcome to Tauri + React</h1>
-//
-//          <div className="row">
-//            <a href="https://vitejs.dev" target="_blank">
-//              <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-//            </a>
-//            <a href="https://tauri.app" target="_blank">
-//              <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-//            </a>
-//            <a href="https://reactjs.org" target="_blank">
-//              <img src={reactLogo} className="logo react" alt="React logo" />
-//            </a>
-//          </div>
-//          <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-//        </Typography>
-//
-//        <form
-//          className="row"
-//          onSubmit={(e) => {
-//            e.preventDefault();
-//            greet();
-//          }}
-//        >
-//          <TextInput
-//            id="greet-input"
-//            onChange={(e) => setName(e.currentTarget.value)}
-//            placeholder="Enter a name..."
-//          />
-//          <Button type="submit">Greet</Button>
-//        </form>
-//        <Typography>
-//          <p>{greetMsg}</p>
-//        </Typography>
+export default App;
