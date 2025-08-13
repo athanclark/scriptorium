@@ -24,7 +24,7 @@ function Nav({ onSelectDocument, onChangeBooks, reload }: NavProps) {
     <div className="nav">
       <Transition
         mounted={!bookIsSelected}
-        transition="fade-left"
+        transition="fade-right"
         duration={400}
         timingFunction="ease">
         {(styles) => <div style={styles}>
