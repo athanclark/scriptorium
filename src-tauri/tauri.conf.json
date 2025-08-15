@@ -18,7 +18,14 @@
       }
     ],
     "security": {
-      "csp": null
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$HOME/*",
+          "$PICTURE/*"
+        ]
+      },
+      "csp": "default-src 'self'; img-src 'self' asset: tauri: blob: data: https: http:;"
     }
   },
   "bundle": {

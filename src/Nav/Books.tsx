@@ -3,7 +3,7 @@ import { otherColor, iconBackgroundStyles } from "../colors";
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import Database from "@tauri-apps/plugin-sql";
-import { Button, Title, NavLink, Loader, Anchor, Transition, TextInput, ColorInput, Typography, Modal, Divider, Stack } from "@mantine/core";
+import { Button, Title, NavLink, Loader, Anchor, Transition, TextInput, ColorInput, Typography, Modal, Divider, Stack, useComputedColorScheme } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconArrowLeft, IconPlus } from '@tabler/icons-react';
 
@@ -23,6 +23,7 @@ type BooksProps = {
 function Books({ onSelectBook, reload }: BooksProps) {
   const [books, setBooks] = useState<Book[] | null>(null);
   const [trashes, setTrashes] = useState<Book[] | null>(null);
+  const colorScheme = useComputedColorScheme("auto");
 
   useEffect(() => {
     async function go() {

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+// import { convertFileSrc } from "@tauri-apps/api/tauri"
 import { NativeSelect, Typography, Tabs, Textarea } from "@mantine/core";
 import { IconEdit, IconEye } from "@tabler/icons-react";
 import ReactMarkdown from "react-markdown";
@@ -19,6 +20,8 @@ type EditorProps = {
 export type Syntax = "md" | "adoc" | "html";
 
 function Editor({ value, setValue, syntax, setSyntax }: EditorProps) {
+  const [currentTab, setCurrentTab] = useState<string | null>("edit");
+
   return (
     <>
       <NativeSelect
@@ -34,7 +37,7 @@ function Editor({ value, setValue, syntax, setSyntax }: EditorProps) {
           {label: "HTML", value: "html"}
         ]}
       />
-      <Tabs defaultValue="edit">
+      <Tabs value={currentTab} onChange={setCurrentTab}>
         <Tabs.List>
           <Tabs.Tab value="edit" leftSection={<IconEdit size={12} />}>Edit</Tabs.Tab>
           <Tabs.Tab value="view" leftSection={<IconEye size={12} />}>View</Tabs.Tab>
@@ -43,7 +46,7 @@ function Editor({ value, setValue, syntax, setSyntax }: EditorProps) {
           <Edit value={value} setValue={setValue} syntax={syntax} />
         </Tabs.Panel>
         <Tabs.Panel value="view">
-          <View value={value} syntax={syntax} />
+          { currentTab === "view" && (<View value={value} syntax={syntax} />) }
         </Tabs.Panel>
       </Tabs>
     </>
@@ -77,7 +80,15 @@ const asciidoctor = Asciidoctor();
 
 function View({ value, syntax }: ViewProps) {
   const renderedValue = syntax === "md"
-    ? (<ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{value}</ReactMarkdown>)
+    ? (
+      <ReactMarkdown
+        components={{ img: Img }}
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
+      >
+        {value}
+      </ReactMarkdown>
+    )
     : syntax === "adoc"
     ? (<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(asciidoctor.convert(value)) }} />)
     : syntax === "html"
@@ -89,5 +100,33 @@ function View({ value, syntax }: ViewProps) {
     </Typography>
   );
 }
+
+function toTauriImgSrc(src?: string) {
+  if (!src) return src;
+
+  // Handle Unix absolute paths, Windows absolute paths, and file:// URLs
+  const isUnixAbs = src.startsWith('/');
+  const isWinAbs = /^[a-zA-Z]:[\\/]/.test(src);
+  const isFileUrl = src.startsWith('file://');
+
+  if (isUnixAbs || isWinAbs || isFileUrl) {
+    // strip file:// for convertFileSrc
+    const path = isFileUrl ? src.replace(/^file:\/\//, '') : src;
+    try {
+      return convertFileSrc(path);
+    } catch {
+      // In non‑Tauri environments, fall back to original
+      return src;
+    }
+  }
+
+  // Leave http(s), data:, blob:, and relative app assets alone
+  return src;
+}
+
+const Img: React.FC<JSX.IntrinsicElements['img']> = (props) => {
+  const { src, ...rest } = props;
+  return <img src={toTauriImgSrc(src)} {...rest} />;
+};
 
 export default Editor;
