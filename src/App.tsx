@@ -1,7 +1,8 @@
+import React from "react";
 import Nav from "./Nav";
 import Document from "./Document";
 import { useState } from "react";
-import { AppShell, Burger, TextInput, Typography, ActionIcon, Modal, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, MantineProvider, useComputedColorScheme } from "@mantine/core";
+import { AppShell, Burger, TextInput, Typography, ActionIcon, Modal, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, useComputedColorScheme } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconSettings, IconPlus } from "@tabler/icons-react";
 import "@mantine/core/styles.css";
@@ -49,51 +50,49 @@ function App() {
   console.log("hello");
 
   return (
-    <MantineProvider defaultColorScheme="auto">
-      <AppShell
-        padding="md"
-        header={{ height: 30 }}
-        navbar={{
-          width: 300,
-          breakpoint: 'sm',
-          collapsed: { mobile: !opened }
-        }}
-      >
-        <AppShell.Header>
-          <div style={{display: "flex", justifyContent: "space-between"}}>
-            <Modal opened={openedSettings} onClose={closeSettings} title="Settings" size="auto">
-              <Settings />
-            </Modal>
-            <Burger
-              opened={opened}
-              onClick={toggle}
-              hiddenFrom="sm"
-              size="sm"
+    <AppShell
+      padding="md"
+      header={{ height: 30 }}
+      navbar={{
+        width: 300,
+        breakpoint: 'sm',
+        collapsed: { mobile: !opened }
+      }}
+    >
+      <AppShell.Header>
+        <div style={{display: "flex", justifyContent: "space-between"}}>
+          <Modal opened={openedSettings} onClose={closeSettings} title="Settings" size="auto">
+            <Settings />
+          </Modal>
+          <Burger
+            opened={opened}
+            onClick={toggle}
+            hiddenFrom="sm"
+            size="sm"
+          />
+          <div>Scriptorium</div>
+          <ActionIcon onClick={openSettings} variant="transparent" color="black" aria-label="Settings"><IconSettings /></ActionIcon>
+        </div>
+      </AppShell.Header>
+
+      <NavbarWrapper setSelectedDoc={setSelectedDoc} setReloadDoc={setReloadDoc} reloadDoc={reloadDoc} reloadNav={reloadNav} />
+
+      <AppShell.Main>
+        {
+          selectedDoc
+            ? <Document
+              doc={selectedDoc}
+              reload={reloadDoc}
+              onUpdateDocument={() => setReloadNav(!reloadNav)}
+              onDeleteDocument={() => {
+                setSelectedDoc(null);
+                setReloadNav(!reloadNav);
+              }}
             />
-            <div>Scriptorium</div>
-            <ActionIcon onClick={openSettings} variant="transparent" color="black" aria-label="Settings"><IconSettings /></ActionIcon>
-          </div>
-        </AppShell.Header>
-
-        <NavbarWrapper setSelectedDoc={setSelectedDoc} setReloadDoc={setReloadDoc} reloadDoc={reloadDoc} reloadNav={reloadNav} />
-
-        <AppShell.Main>
-          {
-            selectedDoc
-              ? <Document
-                doc={selectedDoc}
-                reload={reloadDoc}
-                onUpdateDocument={() => setReloadNav(!reloadNav)}
-                onDeleteDocument={() => {
-                  setSelectedDoc(null);
-                  setReloadNav(!reloadNav);
-                }}
-              />
-              : <Info />
-          }
-        </AppShell.Main>
-      </AppShell>
-    </MantineProvider>
+            : <Info />
+        }
+      </AppShell.Main>
+    </AppShell>
   );
 }
 
