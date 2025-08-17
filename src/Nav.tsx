@@ -9,10 +9,12 @@ type NavProps = {
   onSelectDocument: React.Dispatch<React.SetStateAction<string | null>>;
   onChangeBooks: () => void;
   reload: boolean;
+  selectedBook: string | null;
+  setSelectedBook: React.Dispatch<React.SetStateAction<string | null>>;
 };
 
-function Nav({ onSelectDocument, onChangeBooks, reload }: NavProps) {
-  const [selectedBook, setSelectedBook] = useState<string | null>(null);
+function Nav({ onSelectDocument, onChangeBooks, reload, selectedBook, setSelectedBook }: NavProps) {
+  // immediate change - used for navigation
   const [bookIsSelected, setBookIsSelected] = useState<boolean>(false);
   const [reloadBooks, setReloadBooks] = useState(false);
 
@@ -29,6 +31,7 @@ function Nav({ onSelectDocument, onChangeBooks, reload }: NavProps) {
               setSelectedBook(b);
               setBookIsSelected(true);
             }}
+            clearSelectedDocument={() => onSelectDocument(null)}
             reload={reloadBooks}
           />
         </div>}
@@ -46,9 +49,6 @@ function Nav({ onSelectDocument, onChangeBooks, reload }: NavProps) {
             goBack={() => {
               onChangeBooks();
               setBookIsSelected(false);
-              setTimeout(() => {
-                setSelectedBook(null);
-              }, 500);
               setReloadBooks(!reloadBooks);
             }}
           />

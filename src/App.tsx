@@ -25,29 +25,10 @@ function App() {
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
   const [reloadNav, setReloadNav] = useState(false);
   const [reloadDoc, setReloadDoc] = useState(false);
+  const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [opened, { toggle }] = useDisclosure();
   const [openedSettings, { open: openSettings, close: closeSettings }] = useDisclosure();
-  // const getColorScheme = () =>
-  //   (typeof window !== 'undefined' &&
-  //     window.matchMedia('(prefers-color-scheme: dark)').matches)
-  //     ? 'dark'
-  //     : 'light';
-  // const [scheme, setScheme] = useState<'light' | 'dark'>(getColorScheme);
-  //
-  // useEffect(() => {
-  //   const m = window.matchMedia('(prefers-color-scheme: dark)');
-  //   const handler = (e: MediaQueryListEvent) => setScheme(e.matches ? 'dark' : 'light');
-  //   m.addEventListener('change', handler);
-  //
-  //   setTimeout(() => {
-  //     const s = getColorScheme();
-  //     console.log('color scheme again', s);
-  //     setScheme(s);
-  //   }, 2000)
-  // }, []);
-  //
-  // console.log("scheeeeme", scheme);
-  console.log("hello");
+  const colorScheme = useComputedColorScheme();
 
   return (
     <AppShell
@@ -71,11 +52,17 @@ function App() {
             size="sm"
           />
           <div>Scriptorium</div>
-          <ActionIcon onClick={openSettings} variant="transparent" color="black" aria-label="Settings"><IconSettings /></ActionIcon>
+          <ActionIcon onClick={openSettings} variant="transparent" color={colorScheme === "light" ? "black" : "white"} aria-label="Settings"><IconSettings /></ActionIcon>
         </div>
       </AppShell.Header>
 
-      <NavbarWrapper setSelectedDoc={setSelectedDoc} setReloadDoc={setReloadDoc} reloadDoc={reloadDoc} reloadNav={reloadNav} />
+      <NavbarWrapper
+        setSelectedDoc={setSelectedDoc}
+        onChangeBooks={() => setReloadDoc(!reloadDoc)}
+        reloadNav={reloadNav}
+        selectedBook={selectedBook}
+        setSelectedBook={setSelectedBook}
+      />
 
       <AppShell.Main>
         {
@@ -88,6 +75,7 @@ function App() {
                 setSelectedDoc(null);
                 setReloadNav(!reloadNav);
               }}
+              toBook={(newBook: string) => setSelectedBook(newBook)}
             />
             : <Info />
         }
@@ -98,12 +86,13 @@ function App() {
 
 type NavbarWrapperProps = {
   setSelectedDoc: React.Dispatch<React.SetStateAction<string | null>>;
-  setReloadDoc: React.Dispatch<React.SetStateAction<boolean>>;
-  reloadDoc: boolean;
+  onChangeBooks: () => void;
   reloadNav: boolean;
+  selectedBook: string | null;
+  setSelectedBook: React.Dispatch<React.SetStateAction<string | null>>;
 };
 
-function NavbarWrapper({ setSelectedDoc, setReloadDoc, reloadDoc, reloadNav }: NavbarWrapperProps) {
+function NavbarWrapper({ setSelectedDoc, onChangeBooks, reloadNav, selectedBook, setSelectedBook }: NavbarWrapperProps) {
   const colorScheme = useComputedColorScheme();
   const bg = colorScheme === "dark" ? "--mantine-color-dark-5" : "--mantine-color-indigo-1";
 
@@ -111,8 +100,10 @@ function NavbarWrapper({ setSelectedDoc, setReloadDoc, reloadDoc, reloadNav }: N
     <AppShell.Navbar style={{background: `var(${bg})`}}>
       <Nav
         onSelectDocument={setSelectedDoc}
-        onChangeBooks={() => setReloadDoc(!reloadDoc)}
+        onChangeBooks={onChangeBooks}
         reload={reloadNav}
+        selectedBook={selectedBook}
+        setSelectedBook={setSelectedBook}
       />
     </AppShell.Navbar>
   );

@@ -19,30 +19,31 @@ type EditorProps = {
 export type Syntax = "md" | "adoc" | "html";
 
 function Editor({ value, setValue, syntax, setSyntax }: EditorProps) {
-  const [currentTab, setCurrentTab] = useState<string | null>("edit");
+  const [currentTab, setCurrentTab] = useState<string | null>("view");
 
   return (
     <>
-      <NativeSelect
-        label="Document Syntax"
-        value={syntax}
-        onChange={(event) => {
-          const v = event.currentTarget.selectedOptions[0].value;
-          const newSyntax: Syntax = v === "md" ? "md" : v === "adoc" ? "adoc" : v === "html" ? "html" : "md";
-          setSyntax(newSyntax);
-        }}
-        data={[
-          {label: "Markdown", value: "md"},
-          {label: "ASCIIdoc", value: "adoc"},
-          {label: "HTML", value: "html"}
-        ]}
-      />
       <Tabs value={currentTab} onChange={setCurrentTab}>
-        <Tabs.List>
-          <Tabs.Tab value="edit" leftSection={<IconEdit size={12} />}>Edit</Tabs.Tab>
+        <Tabs.List style={{marginBottom: "2rem"}}>
           <Tabs.Tab value="view" leftSection={<IconEye size={12} />}>View</Tabs.Tab>
+          <Tabs.Tab value="edit" leftSection={<IconEdit size={12} />}>Edit</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="edit">
+          <NativeSelect
+            label="Document Syntax"
+            value={syntax}
+            onChange={(event) => {
+              const v = event.currentTarget.selectedOptions[0].value;
+              const newSyntax: Syntax = v === "md" ? "md" : v === "adoc" ? "adoc" : v === "html" ? "html" : "md";
+              setSyntax(newSyntax);
+            }}
+            style={{marginBottom: "1rem"}}
+            data={[
+              {label: "Markdown", value: "md"},
+              {label: "ASCIIdoc", value: "adoc"},
+              {label: "HTML", value: "html"}
+            ]}
+          />
           <Edit value={value} setValue={setValue} syntax={syntax} />
         </Tabs.Panel>
         <Tabs.Panel value="view">

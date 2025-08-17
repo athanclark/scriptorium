@@ -5,20 +5,22 @@ import { type Document } from "./Nav/Documents";
 import Editor, { type Syntax } from "./Document/Editor";
 import { useState, useEffect } from "react";
 import Database from "@tauri-apps/plugin-sql";
-import { Button, TextInput, ColorInput, Typography, Modal, Title, NavLink, Grid } from "@mantine/core";
+import { Stack, Button, Divider, Accordion, TextInput, ColorInput, Typography, Modal, Title, NavLink, Grid } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useDebouncedCallback } from "use-debounce";
 import data from "@emoji-mart/data";
 import Picker from "@emoji-mart/react";
+import "./Document.css";
 
 type DocumentProps = {
   doc: string | null;
   reload: boolean;
   onUpdateDocument: () => void;
   onDeleteDocument: () => void;
+  toBook: React.Disptach<React.SetStateAction<string | null>>;
 };
 
-function Document({ doc, reload, onUpdateDocument, onDeleteDocument }: DocumentProps) {
+function Document({ doc, reload, onUpdateDocument, onDeleteDocument, toBook }: DocumentProps) {
   const [content, setContent] = useState("");
   const [name, setName] = useState("");
   const [icon, setIcon] = useState<string | null>(null);
@@ -32,7 +34,6 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument }: DocumentP
   const [openedEmojiPicker, { open: openEmojiPicker, close: closeEmojiPicker }] = useDisclosure();
 
   function actuallyReload() {
-    console.log('reloading document');
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
@@ -61,11 +62,11 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument }: DocumentP
 
   function changeDocumentName(newDocumentName: string) {
     setName(newDocumentName);
-    onUpdateDocument();
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
         await db.execute("UPDATE documents SET name = $2 WHERE id = $1", [doc, newDocumentName]);
+        onUpdateDocument();
       } catch(e) {
         console.error("Updating Document Failed", e);
       }
@@ -165,6 +166,7 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument }: DocumentP
         const db = await Database.load(__LOCAL_DB);
         await db.execute("UPDATE documents SET book = $2 WHERE id = $1", [doc, newBook]);
         closeMoveDocument();
+        toBook(newBook);
       } catch(e) {
         console.error("Updating Document Failed", e);
       }
@@ -211,35 +213,57 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument }: DocumentP
             closeEmojiPicker();
           }} />
       </Modal>
-      <Grid>
-        <Grid.Col span={{base: 12}}>
-          <TextInput
-            value={name}
-            onChange={(event) => changeDocumentName(event.currentTarget.value)}
-            label="Document Name"
-          />
-        </Grid.Col>
-        <Grid.Col span={{base: 12, md: 6, lg: 4}}>
-          <Button fullWidth variant="default" onClick={openEmojiPicker} leftSection={<span>{icon}</span>}>Change Icon</Button>
-        </Grid.Col>
-        <Grid.Col span={{base: 12, md: 6, lg: 4}}>
-          <ColorInput swatches={swatches} value={iconColor || ""} onChangeEnd={(c) => changeDocumentIconColor(c)} />
-        </Grid.Col>
-        <Grid.Col span={{base: 12, lg: 4}}>
-          <Button fullWidth variant="default" onClick={openMoveDocument}>Move Document</Button>
-        </Grid.Col>
-      </Grid>
-      <Editor
-        value={content}
-        setValue={changeDocumentContent}
-        syntax={syntax}
-        setSyntax={changeSyntax}
-      />
-      {
-        book === "trash"
-          ? (<Button color="red" onClick={openDeleteDocument}>Delete Document</Button>)
-          : (<Button color="red" onClick={openTrashDocument}>Trash Document</Button>)
-      }
+      <Stack>
+        <TextInput
+          value={name}
+          onChange={(event) => changeDocumentName(event.currentTarget.value)}
+          variant="unstyled"
+          placeholder="Click to Edit"
+          className={"document-name"}
+          styles={theme => ({
+            input: {
+              font: "inherit",
+              fontSize: "2rem",
+              fontStyle: name ? "inherit" : "italic",
+              color: name ? "inherit" : "var(--mantine-color-dimmed0)",
+            }
+          })}
+        />
+        <Editor
+          value={content}
+          setValue={changeDocumentContent}
+          syntax={syntax}
+          setSyntax={changeSyntax}
+        />
+        <div>
+          <Divider />
+          <Accordion style={{}}>
+            <Accordion.Item value="details">
+              <Accordion.Control>Details</Accordion.Control>
+              <Accordion.Panel>
+                <Grid>
+                  <Grid.Col span={{base: 12, md: 6, lg: 3}}>
+                    <Button fullWidth variant="default" onClick={openEmojiPicker} leftSection={<span>{icon}</span>}>Change Icon</Button>
+                  </Grid.Col>
+                  <Grid.Col span={{base: 12, md: 6, lg: 3}}>
+                    <ColorInput styles={theme => ({input: {textAlign: "center"}})} swatches={swatches} value={iconColor || ""} onChangeEnd={(c) => changeDocumentIconColor(c)} />
+                  </Grid.Col>
+                  <Grid.Col span={{base: 12, md: 6, lg: 3}}>
+                    <Button fullWidth variant="default" onClick={openMoveDocument}>Move Document</Button>
+                  </Grid.Col>
+                  <Grid.Col span={{base: 12, md: 6, lg: 3}}>
+                    {
+                      book === "trash"
+                        ? (<Button fullWidth color="red" onClick={openDeleteDocument}>Delete Document</Button>)
+                        : (<Button fullWidth color="red" onClick={openTrashDocument}>Trash Document</Button>)
+                    }
+                  </Grid.Col>
+                </Grid>
+              </Accordion.Panel>
+            </Accordion.Item>
+          </Accordion>
+        </div>
+      </Stack>
     </>
   );
 }

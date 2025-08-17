@@ -15,10 +15,11 @@ export type Book = {
 
 type BooksProps = {
   onSelectBook: React.Dispatch<React.SetStateAction<string | null>>;
+  clearSelectedDocument: () => void;
   reload: boolean;
 };
 
-function Books({ onSelectBook, reload }: BooksProps) {
+function Books({ onSelectBook, clearSelectedDocument, reload }: BooksProps) {
   const [books, setBooks] = useState<Book[] | null>(null);
   const [trashes, setTrashes] = useState<Book[] | null>(null);
 
@@ -47,7 +48,10 @@ function Books({ onSelectBook, reload }: BooksProps) {
     return (<NavLink
       key={b.id}
       href="#"
-      label={b.name}
+      label={b.name === "" ? "No Name" : b.name}
+      style={{
+        fontStyle: b.name === "" ? "italic" : "",
+      }}
       leftSection={icon}
       color={b.trash ? "gray" : ""}
       active={typeof b.trash === "number" ? b.trash === 0 : b.trash}
@@ -64,6 +68,7 @@ function Books({ onSelectBook, reload }: BooksProps) {
     : (<Loader color="blue" />);
 
   function newBook() {
+    clearSelectedDocument();
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);

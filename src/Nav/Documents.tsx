@@ -2,11 +2,12 @@ import { __LOCAL_DB } from "../consts";
 import { otherColor, iconBackgroundStyles, swatches } from "../colors";
 import { useState, useEffect } from "react";
 import Database from "@tauri-apps/plugin-sql";
-import { Button, Title, NavLink, Loader, Anchor, TextInput, ColorInput, Typography, Modal, Stack } from "@mantine/core";
+import { Button, Divider, Title, Accordion, NavLink, Loader, Anchor, TextInput, ColorInput, Typography, Modal, Stack } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconArrowLeft, IconPlus, IconTrash, IconRecycle, IconAlertTriangle } from '@tabler/icons-react';
 import data from "@emoji-mart/data";
 import Picker from "@emoji-mart/react";
+import "./Documents.css";
 
 export type Document = {
   id: string,
@@ -185,9 +186,22 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
       </Modal>
       <Stack>
         <Anchor href="#" onClick={goBack}><IconArrowLeft size={12} /> All Books</Anchor>
-        <TextInput label="Book Name" value={bookName} onChange={e => changeBookName(e.currentTarget.value)} />
-        <Button fullWidth variant="default" onClick={openEmojiPicker} leftSection={<span>{bookIcon}</span>}>Change Icon</Button>
-        <ColorInput label="Book Icon Color" swatches={swatches} value={bookIconColor || ""} onChangeEnd={(c) => changeBookIconColor(c)} />
+        <TextInput
+          placeholder="Click to Edit"
+          className={"book-name"}
+          variant="unstyled"
+          styles={theme => ({
+            input: {
+              font: "inherit",
+              fontSize: "1.5rem",
+              fontStyle: bookName ? "inherit" : "italic",
+              color: bookName ? "inherit" : "var(--mantine-color-dimmed0)",
+            }
+          })}
+          value={bookName}
+          onChange={e => changeBookName(e.currentTarget.value)}
+        />
+        <Divider />
         <Title order={3}>Documents</Title>
         {
           !(book === "trash") && (
@@ -199,13 +213,25 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
         <div>
           { renderedDocuments }
         </div>
-        {
-          !(book === "trash") && (
-            bookTrash
-              ? (<Button leftSection={<IconAlertTriangle size={14} />} color="red" fullWidth onClick={openDeleteBook}>Delete Book</Button>)
-              : (<Button leftSection={<IconTrash size={14} />} color="red" fullWidth onClick={openTrashBook}>Trash Book</Button>)
-          )
-        }
+        <div>
+          <Divider />
+          <Accordion>
+            <Accordion.Item value="details">
+              <Accordion.Control>Details</Accordion.Control>
+              <Accordion.Panel>
+                <Button fullWidth variant="default" onClick={openEmojiPicker} leftSection={<span>{bookIcon}</span>}>Change Icon</Button>
+                <ColorInput styles={theme => ({input: {textAlign: "center"}})} swatches={swatches} value={bookIconColor || ""} onChangeEnd={(c) => changeBookIconColor(c)} />
+                {
+                  !(book === "trash") && (
+                    bookTrash
+                      ? (<Button leftSection={<IconAlertTriangle size={14} />} color="red" fullWidth onClick={openDeleteBook}>Delete Book</Button>)
+                      : (<Button leftSection={<IconTrash size={14} />} color="red" fullWidth onClick={openTrashBook}>Trash Book</Button>)
+                  )
+                }
+              </Accordion.Panel>
+            </Accordion.Item>
+          </Accordion>
+        </div>
       </Stack>
     </>
   );
