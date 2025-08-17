@@ -1,26 +1,24 @@
 import Nav from "./Nav";
 import Document from "./Document";
-import { useState, useEffect } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import { AppShell, Burger, Button, TextInput, Typography, Drawer, ActionIcon, Modal, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, MantineProvider, useComputedColorScheme } from "@mantine/core";
+import { useState } from "react";
+import { AppShell, Burger, TextInput, Typography, ActionIcon, Modal, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, MantineProvider, useComputedColorScheme } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconSettings, IconPlus } from "@tabler/icons-react";
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 
-function useSystemColorScheme(): 'light' | 'dark' {
-
-  useEffect(() => {
-    setTimeout(() => {
-      const s = get();
-      setScheme(s);
-    }, 1000);
-    return () => m.removeEventListener('change', handler);
-  }, []);
-
-  return scheme;
-}
+// function useSystemColorScheme(): 'light' | 'dark' {
+//
+//   useEffect(() => {
+//     setTimeout(() => {
+//       const s = get();
+//       setScheme(s);
+//     }, 1000);
+//     return () => m.removeEventListener('change', handler);
+//   }, []);
+//
+//   return scheme;
+// }
 
 function App() {
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
@@ -48,6 +46,7 @@ function App() {
   // }, []);
   //
   // console.log("scheeeeme", scheme);
+  console.log("hello");
 
   return (
     <MantineProvider defaultColorScheme="auto">
@@ -98,8 +97,15 @@ function App() {
   );
 }
 
-function NavbarWrapper({ setSelectedDoc, setReloadDoc, reloadDoc, reloadNav }) {
-  const colorScheme = useComputedColorScheme("auto");
+type NavbarWrapperProps = {
+  setSelectedDoc: React.Dispatch<React.SetStateAction<string | null>>;
+  setReloadDoc: React.Dispatch<React.SetStateAction<boolean>>;
+  reloadDoc: boolean;
+  reloadNav: boolean;
+};
+
+function NavbarWrapper({ setSelectedDoc, setReloadDoc, reloadDoc, reloadNav }: NavbarWrapperProps) {
+  const colorScheme = useComputedColorScheme();
   const bg = colorScheme === "dark" ? "--mantine-color-dark-5" : "--mantine-color-indigo-1";
 
   return (

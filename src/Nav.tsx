@@ -1,27 +1,20 @@
 import Documents from "./Nav/Documents";
 import Books from "./Nav/Books";
 import { __LOCAL_DB } from "./consts";
-import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import Database from "@tauri-apps/plugin-sql";
-import { Button, Title, NavLink, Loader, Anchor, Transition, TextInput, ColorInput, Typography, Modal, MantineProvider, useComputedColorScheme } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
-import { IconArrowLeft, IconPlus } from '@tabler/icons-react';
+import { useState } from "react";
+import { Transition } from "@mantine/core";
 import "./Nav.css";
 
 type NavProps = {
-  onSelectDocument: React.Dispatch<React.SetStateAction<string>>;
+  onSelectDocument: React.Dispatch<React.SetStateAction<string | null>>;
   onChangeBooks: () => void;
-  reload: bool;
+  reload: boolean;
 };
 
 function Nav({ onSelectDocument, onChangeBooks, reload }: NavProps) {
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [bookIsSelected, setBookIsSelected] = useState<boolean>(false);
   const [reloadBooks, setReloadBooks] = useState(false);
-  const colorScheme = useComputedColorScheme("auto");
-
-  console.log("color scheme", colorScheme);
 
   return (
     <div className="nav">

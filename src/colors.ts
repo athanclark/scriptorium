@@ -3,11 +3,13 @@ import { lighten, darken } from "polished";
 function isLightColor(color: string): boolean {
   // Create a dummy element to parse CSS color formats
   const ctx = document.createElement("canvas").getContext("2d");
+  // @ts-ignore
   ctx.fillStyle = color;
+  // @ts-ignore
   const computed = ctx.fillStyle;
 
   // Extract RGB values from the computed color
-  const rgb = computed.match(/\d+/g).map(Number);
+  const rgb = (computed.match(/\d+/g) || [0, 0, 0]).map(Number);
   const [r, g, b] = rgb;
 
   // Calculate luminance per WCAG formula

@@ -1,12 +1,11 @@
 import { __LOCAL_DB } from "./consts";
 import { swatches } from "./colors";
 import { type Book } from "./Nav/Books";
+import { type Document } from "./Nav/Documents";
 import Editor, { type Syntax } from "./Document/Editor";
 import { useState, useEffect } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
 import Database from "@tauri-apps/plugin-sql";
-import { AppShell, Burger, Button, TextInput, ColorInput, Typography, Modal, Title, NavLink, Grid } from "@mantine/core";
+import { Button, TextInput, ColorInput, Typography, Modal, Title, NavLink, Grid } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useDebouncedCallback } from "use-debounce";
 import data from "@emoji-mart/data";
@@ -37,14 +36,17 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument }: DocumentP
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
-        const res = await db.select<Document>("SELECT name, syntax, content, book, icon, icon_color AS iconColor FROM documents WHERE id = $1", [doc]);
+        const res = await db.select<(Document & { book: string, syntax: Syntax, content: string })[]>(
+          "SELECT name, syntax, content, book, icon, icon_color AS iconColor FROM documents WHERE id = $1",
+          [doc]
+        );
         setName(res[0].name);
         setContent(res[0].content);
         setIcon(res[0].icon);
         setIconColor(res[0].iconColor);
         setSyntax(res[0].syntax);
         setBook(res[0].book);
-        const bs = await db.select<Book>("SELECT id, name, trash, icon, icon_color AS iconColor FROM books WHERE trash = 0 AND id <> $1", [res[0].book]);
+        const bs = await db.select<Book[]>("SELECT id, name, trash, icon, icon_color AS iconColor FROM books WHERE trash = 0 AND id <> $1", [res[0].book]);
         setOtherBooks(bs);
       } catch(e) {
         console.error("Fetching document details Failed", e);
@@ -116,7 +118,7 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument }: DocumentP
     go();
   }
 
-  function changeSyntax(newSyntax: string) {
+  function changeSyntax(newSyntax: Syntax) {
     setSyntax(newSyntax);
     async function go() {
       try {
@@ -204,7 +206,7 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument }: DocumentP
       <Modal opened={openedEmojiPicker} onClose={closeEmojiPicker} title="Pick Icon">
         <Picker
           data={data}
-          onEmojiSelect={emoji => {
+          onEmojiSelect={(emoji: { native: string }) => {
             changeDocumentIcon(emoji.native);
             closeEmojiPicker();
           }} />

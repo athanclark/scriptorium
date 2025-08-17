@@ -1,27 +1,26 @@
 import { __LOCAL_DB } from "../consts";
 import { otherColor, iconBackgroundStyles, swatches } from "../colors";
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import Database from "@tauri-apps/plugin-sql";
-import { Button, Title, NavLink, Loader, Anchor, Transition, TextInput, ColorInput, Typography, Modal, Stack } from "@mantine/core";
+import { Button, Title, NavLink, Loader, Anchor, TextInput, ColorInput, Typography, Modal, Stack } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconArrowLeft, IconPlus, IconTrash, IconRecycle, IconAlertTriangle } from '@tabler/icons-react';
 import data from "@emoji-mart/data";
 import Picker from "@emoji-mart/react";
 
-type Document = {
+export type Document = {
   id: string,
   name: string,
   icon: string | null,
   iconColor: string | null,
+  trash: boolean | number,
 }
 
 type DocumentsProps = {
   book: string | null;
-  initBookName: string | null;
-  onSelectDocument: React.Dispatch<React.SetStateAction<string>>;
+  onSelectDocument: React.Dispatch<React.SetStateAction<string | null>>;
   goBack: () => void;
-  reload: bool;
+  reload: boolean;
 };
 
 function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
@@ -38,13 +37,13 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
-        const bs = await db.select<Document>("SELECT id, name, icon, icon_color AS iconColor FROM documents WHERE book = $1", [book]);
+        const bs = await db.select<Document[]>("SELECT id, name, icon, icon_color AS iconColor FROM documents WHERE book = $1", [book]);
         setDocuments(bs);
-        const res = await db.select<Document>("SELECT name, icon, trash, icon_color AS iconColor FROM books WHERE id = $1", [book]);
+        const res = await db.select<Document[]>("SELECT name, icon, trash, icon_color AS iconColor FROM books WHERE id = $1", [book]);
         setBookName(res[0].name);
         setBookIcon(res[0].icon);
         setBookIconColor(res[0].iconColor);
-        setBookTrash(res[0].trash);
+        setBookTrash(res[0].trash === 1);
       } catch(e) {
         console.error("Fetching documents Failed", e);
       }
@@ -155,9 +154,9 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
-        const res = await db.select<{ id: string }>("INSERT INTO documents (name, content, book) VALUES ('', '', $1) RETURNING id", [book]);
+        const res = await db.select<{ id: string }[]>("INSERT INTO documents (name, content, book) VALUES ('', '', $1) RETURNING id", [book]);
         onSelectDocument(res[0].id);
-        reload();
+        actuallyReload();
       } catch(e) {
         console.error("Fetching Documents Failed", e);
       }
@@ -179,7 +178,7 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
         <Button color="red" onClick={deleteBook}>Delete {bookName}</Button>
       </Modal>
       <Modal opened={openedEmojiPicker} onClose={closeEmojiPicker} title="Pick Icon">
-        <Picker data={data} onEmojiSelect={emoji => {
+        <Picker data={data} onEmojiSelect={(emoji: { native: string }) => {
           changeBookIcon(emoji.native);
           closeEmojiPicker();
         }} />

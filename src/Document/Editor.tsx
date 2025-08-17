@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-// import { convertFileSrc } from "@tauri-apps/api/tauri"
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { NativeSelect, Typography, Tabs, Textarea } from "@mantine/core";
 import { IconEdit, IconEye } from "@tabler/icons-react";
 import ReactMarkdown from "react-markdown";
@@ -12,9 +11,9 @@ import "highlight.js/styles/github.css";
 
 type EditorProps = {
   value: string;
-  setValue: React.Dispatch<React.SetStateAction<string>>;
+  setValue: (newValue: string) => void;
   syntax: Syntax;
-  setSyntax: React.Dispatch<React.SetStateAction<Syntax>>;
+  setSyntax: (newSyntax: Syntax) => void;
 };
 
 export type Syntax = "md" | "adoc" | "html";
@@ -28,7 +27,8 @@ function Editor({ value, setValue, syntax, setSyntax }: EditorProps) {
         label="Document Syntax"
         value={syntax}
         onChange={(event) => {
-          const newSyntax = event.currentTarget.selectedOptions[0].value;
+          const v = event.currentTarget.selectedOptions[0].value;
+          const newSyntax: Syntax = v === "md" ? "md" : v === "adoc" ? "adoc" : v === "html" ? "html" : "md";
           setSyntax(newSyntax);
         }}
         data={[
@@ -55,11 +55,11 @@ function Editor({ value, setValue, syntax, setSyntax }: EditorProps) {
 
 type EditProps = {
   value: string;
-  setValue: React.Dispatch<React.SetStateAction<string>>;
+  setValue: (newValue: string) => void;
   syntax: Syntax;
 };
 
-function Edit({ value, setValue, syntax }: EditProps) {
+function Edit({ value, setValue }: EditProps) {
   return (
     <Textarea
       autosize
@@ -90,6 +90,7 @@ function View({ value, syntax }: ViewProps) {
       </ReactMarkdown>
     )
     : syntax === "adoc"
+    // @ts-ignore
     ? (<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(asciidoctor.convert(value)) }} />)
     : syntax === "html"
     ? (<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(value) }} />)
