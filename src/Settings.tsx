@@ -1,6 +1,7 @@
 import React from "react";
 import { __LOCAL_DB } from "./consts";
 import Nav from "./Nav";
+import { type ColorScheme } from "./App";
 import Document from "./Document";
 import { useState, useEffect } from "react";
 import { Switch, Divider, Burger, TextInput, Button, Typography, ActionIcon, Modal, Loader, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, useComputedColorScheme } from "@mantine/core";
@@ -36,7 +37,12 @@ const defaultRemoteServer = {
   password: "",
 };
 
-function Settings() {
+type SettingsProps = {
+  colorScheme: ColorScheme;
+  setColorScheme: React.Dispatch<React.SetStateAction<ColorScheme>>;
+}
+
+function Settings({ colorScheme, setColorScheme }: SettingsProps) {
   const [newRemoteServer, setNewRemoteServer] = useState<RemoteServer>(defaultRemoteServer);
   const [remoteServers, setRemoteServers] = useState<(RemoteServer & {id: string, editing: boolean})[] | null>(null);
 
@@ -269,12 +275,34 @@ function Settings() {
         { remoteServers ? remoteServers.map(viewRemoteServer) : <Loader /> }
       </Grid>
       <Divider label="Synchronization Settings" />
-      <ArbitrarySettings />
+      <ArbitrarySettings colorScheme={colorScheme} setColorScheme={setColorScheme} />
     </Stack>
   );
 }
 
-function ArbitrarySettings() {
+type ArbitrarySettingsProps = {
+  colorScheme: ColorScheme;
+  setColorScheme: React.Dispatch<React.SetStateAction<ColorScheme>>;
+}
+
+function ArbitrarySettings({ colorScheme, setColorScheme }: ArbitrarySettingsProps) {
+  function changeColorScheme(c: ColorScheme) {
+    console.log("setting color scheme", c);
+    setColorScheme(c);
+    async function go() {
+      try {
+        const db = await Database.load(__LOCAL_DB);
+        await db.execute<(RemoteServer & { id: string })[]>(
+          "INSERT INTO settings (key, value) VALUES ('color_scheme', $1) ON CONFLICT(key) DO UPDATE SET value = $1",
+          [c]
+        );
+      } catch(e) {
+        console.error("Couldn't save color scheme", e);
+      }
+    }
+    go();
+  }
+
   return (
     <>
       <Switch label="Automatically Synchronize" />
@@ -282,7 +310,16 @@ function ArbitrarySettings() {
       <Button>Synchronize Now</Button>
       <Divider />
       <Title order={2}>Additional Settings</Title>
-      <NativeSelect label="Color Scheme" data={["Automatic", "Dark", "Light"]} />
+      <NativeSelect
+        label="Color Scheme"
+        value={colorScheme}
+        onChange={e => changeColorScheme(e.currentTarget.selectedOptions[0].value)}
+        data={[
+          {label: "System", value: "auto"},
+          {label: "Dark", value: "dark"},
+          {label: "Light", value: "light"},
+        ]}
+      />
     </>
   );
 }

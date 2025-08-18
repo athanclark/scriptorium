@@ -22,16 +22,20 @@ import "@mantine/notifications/styles.css";
 //
 //   return scheme;
 // }
+//
+
+type ColorScheme = "auto" | "light" | "dark";
 
 function App() {
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
   const [reloadNav, setReloadNav] = useState(false);
   const [reloadDoc, setReloadDoc] = useState(false);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
+  const [colorScheme, setColorScheme] = useState<ColorScheme>("auto");
   const [opened, { toggle }] = useDisclosure();
 
   return (
-    <MantineProvider defaultColorScheme="auto">
+    <MantineProvider forceColorScheme={colorScheme}>
       <Notifications />
       <AppShell
         padding="md"
@@ -43,7 +47,7 @@ function App() {
         }}
       >
         <AppShell.Header>
-          <Header opened={opened} toggle={toggle} />
+          <Header opened={opened} toggle={toggle} colorScheme={colorScheme} setColorScheme={setColorScheme} />
         </AppShell.Header>
 
         <NavbarWrapper
@@ -78,16 +82,18 @@ function App() {
 type HeaderProps = {
   opened: boolean;
   toggle: () => void;
+  colorScheme: ColorScheme;
+  setColorScheme: React.Dispatch<React.SetStateAction<ColorScheme>>;
 }
 
-function Header({opened, toggle}: HeaderProps) {
-  const colorScheme = useComputedColorScheme();
+function Header({opened, toggle, colorScheme, setColorScheme}: HeaderProps) {
+  const computedColorScheme = useComputedColorScheme();
   const [openedSettings, { open: openSettings, close: closeSettings }] = useDisclosure();
 
   return (
     <div style={{display: "flex", justifyContent: "space-between"}}>
       <Modal opened={openedSettings} onClose={closeSettings} title="Settings" size="100%">
-        <Settings />
+        <Settings colorScheme={colorScheme} setColorScheme={setColorScheme} />
       </Modal>
       <Burger
         opened={opened}
@@ -96,7 +102,7 @@ function Header({opened, toggle}: HeaderProps) {
         size="sm"
       />
       <div>Scriptorium</div>
-      <ActionIcon onClick={openSettings} variant="transparent" color={colorScheme === "light" ? "black" : "white"} aria-label="Settings"><IconSettings /></ActionIcon>
+      <ActionIcon onClick={openSettings} variant="transparent" color={computedColorScheme === "light" ? "black" : "white"} aria-label="Settings"><IconSettings /></ActionIcon>
     </div>
   );
 }
