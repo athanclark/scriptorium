@@ -1,8 +1,10 @@
 import React from "react";
 import Nav from "./Nav";
 import Document from "./Document";
+import Settings from "./Settings";
 import { useState } from "react";
-import { AppShell, Burger, TextInput, Typography, ActionIcon, Modal, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, useComputedColorScheme } from "@mantine/core";
+import { MantineProvider, AppShell, Burger, TextInput, Typography, ActionIcon, Modal, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, useComputedColorScheme } from "@mantine/core";
+import { Notifications } from "@mantine/notifications";
 import { useDisclosure } from "@mantine/hooks";
 import { IconSettings, IconPlus } from "@tabler/icons-react";
 import "@mantine/core/styles.css";
@@ -27,60 +29,75 @@ function App() {
   const [reloadDoc, setReloadDoc] = useState(false);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [opened, { toggle }] = useDisclosure();
-  const [openedSettings, { open: openSettings, close: closeSettings }] = useDisclosure();
-  const colorScheme = useComputedColorScheme();
 
   return (
-    <AppShell
-      padding="md"
-      header={{ height: 30 }}
-      navbar={{
-        width: 300,
-        breakpoint: 'sm',
-        collapsed: { mobile: !opened }
-      }}
-    >
-      <AppShell.Header>
-        <div style={{display: "flex", justifyContent: "space-between"}}>
-          <Modal opened={openedSettings} onClose={closeSettings} title="Settings" size="auto">
-            <Settings />
-          </Modal>
-          <Burger
-            opened={opened}
-            onClick={toggle}
-            hiddenFrom="sm"
-            size="sm"
-          />
-          <div>Scriptorium</div>
-          <ActionIcon onClick={openSettings} variant="transparent" color={colorScheme === "light" ? "black" : "white"} aria-label="Settings"><IconSettings /></ActionIcon>
-        </div>
-      </AppShell.Header>
+    <MantineProvider defaultColorScheme="auto">
+      <Notifications />
+      <AppShell
+        padding="md"
+        header={{ height: 30 }}
+        navbar={{
+          width: 300,
+          breakpoint: 'sm',
+          collapsed: { mobile: !opened }
+        }}
+      >
+        <AppShell.Header>
+          <Header opened={opened} toggle={toggle} />
+        </AppShell.Header>
 
-      <NavbarWrapper
-        setSelectedDoc={setSelectedDoc}
-        onChangeBooks={() => setReloadDoc(!reloadDoc)}
-        reloadNav={reloadNav}
-        selectedBook={selectedBook}
-        setSelectedBook={setSelectedBook}
+        <NavbarWrapper
+          setSelectedDoc={setSelectedDoc}
+          onChangeBooks={() => setReloadDoc(!reloadDoc)}
+          reloadNav={reloadNav}
+          selectedBook={selectedBook}
+          setSelectedBook={setSelectedBook}
+        />
+
+        <AppShell.Main>
+          {
+            selectedDoc
+              ? <Document
+                doc={selectedDoc}
+                reload={reloadDoc}
+                onUpdateDocument={() => setReloadNav(!reloadNav)}
+                onDeleteDocument={() => {
+                  setSelectedDoc(null);
+                  setReloadNav(!reloadNav);
+                }}
+                toBook={(newBook: string) => setSelectedBook(newBook)}
+              />
+              : <Info />
+          }
+        </AppShell.Main>
+      </AppShell>
+    </MantineProvider>
+  );
+}
+
+type HeaderProps = {
+  opened: boolean;
+  toggle: () => void;
+}
+
+function Header({opened, toggle}: HeaderProps) {
+  const colorScheme = useComputedColorScheme();
+  const [openedSettings, { open: openSettings, close: closeSettings }] = useDisclosure();
+
+  return (
+    <div style={{display: "flex", justifyContent: "space-between"}}>
+      <Modal opened={openedSettings} onClose={closeSettings} title="Settings" size="100%">
+        <Settings />
+      </Modal>
+      <Burger
+        opened={opened}
+        onClick={toggle}
+        hiddenFrom="sm"
+        size="sm"
       />
-
-      <AppShell.Main>
-        {
-          selectedDoc
-            ? <Document
-              doc={selectedDoc}
-              reload={reloadDoc}
-              onUpdateDocument={() => setReloadNav(!reloadNav)}
-              onDeleteDocument={() => {
-                setSelectedDoc(null);
-                setReloadNav(!reloadNav);
-              }}
-              toBook={(newBook: string) => setSelectedBook(newBook)}
-            />
-            : <Info />
-        }
-      </AppShell.Main>
-    </AppShell>
+      <div>Scriptorium</div>
+      <ActionIcon onClick={openSettings} variant="transparent" color={colorScheme === "light" ? "black" : "white"} aria-label="Settings"><IconSettings /></ActionIcon>
+    </div>
   );
 }
 
@@ -114,37 +131,6 @@ function Info() {
     <Typography>
       <p>Select or create a Document to begin taking notes. Documents live inside Books.</p>
     </Typography>
-  );
-}
-
-function Settings() {
-  return (
-    <Stack>
-      <Title order={2}>Remote Servers</Title>
-      <Grid>
-        <Grid.Col span={2}>
-          <NativeSelect label="Database Type" data={["MySQL", "PostgreSQL"]} />
-        </Grid.Col>
-        <Grid.Col span={2}>
-          <TextInput label="Host" />
-        </Grid.Col>
-        <Grid.Col span={1}>
-          <NumberInput label="Port" />
-        </Grid.Col>
-        <Grid.Col span={2}>
-          <TextInput label="Database" />
-        </Grid.Col>
-        <Grid.Col span={2}>
-          <TextInput label="Username" />
-        </Grid.Col>
-        <Grid.Col span={2}>
-          <PasswordInput label="Password" />
-        </Grid.Col>
-        <Grid.Col span={1} style={{display: "flex", alignItems: "center", justifyContent: "space-around"}}>
-          <ActionIcon><IconPlus /></ActionIcon>
-        </Grid.Col>
-      </Grid>
-    </Stack>
   );
 }
 

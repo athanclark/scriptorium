@@ -219,15 +219,17 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
             <Accordion.Item value="details">
               <Accordion.Control>Details</Accordion.Control>
               <Accordion.Panel>
-                <Button fullWidth variant="default" onClick={openEmojiPicker} leftSection={<span>{bookIcon}</span>}>Change Icon</Button>
-                <ColorInput styles={theme => ({input: {textAlign: "center"}})} swatches={swatches} value={bookIconColor || ""} onChangeEnd={(c) => changeBookIconColor(c)} />
-                {
-                  !(book === "trash") && (
-                    bookTrash
-                      ? (<Button leftSection={<IconAlertTriangle size={14} />} color="red" fullWidth onClick={openDeleteBook}>Delete Book</Button>)
-                      : (<Button leftSection={<IconTrash size={14} />} color="red" fullWidth onClick={openTrashBook}>Trash Book</Button>)
-                  )
-                }
+                <Stack>
+                  <Button fullWidth variant="default" onClick={openEmojiPicker} leftSection={<span>{bookIcon}</span>}>Change Icon</Button>
+                  <ColorInput styles={theme => ({input: {textAlign: "center"}})} swatches={swatches} value={bookIconColor || ""} onChangeEnd={(c) => changeBookIconColor(c)} />
+                  {
+                    !(book === "trash") && (
+                      bookTrash
+                        ? (<Button leftSection={<IconAlertTriangle size={14} />} color="red" fullWidth onClick={openDeleteBook}>Delete Book</Button>)
+                        : (<Button leftSection={<IconTrash size={14} />} color="red" fullWidth onClick={openTrashBook}>Trash Book</Button>)
+                    )
+                  }
+                </Stack>
               </Accordion.Panel>
             </Accordion.Item>
           </Accordion>
