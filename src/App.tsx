@@ -1,12 +1,14 @@
 import React from "react";
+import { __LOCAL_DB } from "./consts";
 import Nav from "./Nav";
 import Document from "./Document";
 import Settings from "./Settings";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MantineProvider, AppShell, Burger, TextInput, Typography, ActionIcon, Modal, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, useComputedColorScheme } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { useDisclosure } from "@mantine/hooks";
 import { IconSettings, IconPlus } from "@tabler/icons-react";
+import Database from "@tauri-apps/plugin-sql";
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 
@@ -33,6 +35,24 @@ function App() {
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [colorScheme, setColorScheme] = useState<ColorScheme>("auto");
   const [opened, { toggle }] = useDisclosure();
+  
+  useEffect(() => {
+    async function go() {
+      try {
+        const db = await Database.load(__LOCAL_DB);
+        const vs = await db.select<{ value: string }[]>(
+          "SELECT value FROM settings WHERE key = 'color_scheme'",
+          []
+        );
+        if (vs[0]) {
+          setColorScheme(vs[0].value)
+        }
+      } catch(e) {
+        console.error("Couldn't save color scheme", e);
+      }
+    }
+    go();
+  }, []);
 
   return (
     <MantineProvider forceColorScheme={colorScheme}>

@@ -71,7 +71,7 @@ function Settings({ colorScheme, setColorScheme }: SettingsProps) {
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
-        await db.execute<(RemoteServer & { id: string })[]>(
+        await db.execute(
           "INSERT INTO remote_servers (host, port, db, user, password, db_type) VALUES ($1, $2, $3, $4, $5, $6)",
           [s.host, s.port, s.db, s.user, s.password, s.dbType]
         );
@@ -93,7 +93,7 @@ function Settings({ colorScheme, setColorScheme }: SettingsProps) {
       async function go() {
         try {
           const db = await Database.load(__LOCAL_DB);
-          await db.execute<(RemoteServer & { id: string })[]>(
+          await db.execute(
             "UPDATE remote_servers (host, port, db, user, password, db_type) SET ($1, $2, $3, $4, $5, $6) WHERE id = $7",
             [s.host, s.port, s.db, s.user, s.password, s.dbType, s.id]
           );
@@ -109,7 +109,7 @@ function Settings({ colorScheme, setColorScheme }: SettingsProps) {
       async function go() {
         try {
           const db = await Database.load(__LOCAL_DB);
-          await db.execute<(RemoteServer & { id: string })[]>(
+          await db.execute(
             "DELETE FROM remote_servers WHERE id = $1",
             [s.id]
           );
@@ -292,7 +292,7 @@ function ArbitrarySettings({ colorScheme, setColorScheme }: ArbitrarySettingsPro
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
-        await db.execute<(RemoteServer & { id: string })[]>(
+        await db.execute(
           "INSERT INTO settings (key, value) VALUES ('color_scheme', $1) ON CONFLICT(key) DO UPDATE SET value = $1",
           [c]
         );
