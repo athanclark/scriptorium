@@ -3,7 +3,7 @@ import { __LOCAL_DB } from "./consts";
 import Nav from "./Nav";
 import { type ColorScheme } from "./App";
 import Document from "./Document";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Switch, Divider, Burger, TextInput, Button, Typography, ActionIcon, Modal, Loader, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, useComputedColorScheme } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconSettings, IconPlus, IconCheck, IconTrash, IconCancel, IconEdit } from "@tabler/icons-react";
@@ -70,6 +70,7 @@ function Settings({ colorScheme, setColorScheme }: SettingsProps) {
     const s = newRemoteServer;
     async function go() {
       try {
+        // FIXME check health of connection first?
         const db = await Database.load(__LOCAL_DB);
         await db.execute(
           "INSERT INTO remote_servers (host, port, db, user, password, db_type) VALUES ($1, $2, $3, $4, $5, $6)",
@@ -286,8 +287,71 @@ type ArbitrarySettingsProps = {
 }
 
 function ArbitrarySettings({ colorScheme, setColorScheme }: ArbitrarySettingsProps) {
+  const [autoSync, setAutoSync] = useState<boolean>(true);
+  const [autoSyncTime, setAutoSyncTime] = useState<number>(5);
+  const [countDown, setCountDown] = useState<number | null>(5);
+  const autoSyncThreadRef = useRef(null);
+  const countDownThreadRef = useRef(null);
+
+  // may need a ref to manage threads
+
+  useEffect(() => {
+    async function go() {
+      try {
+        const db = await Database.load(__LOCAL_DB);
+        const newAutoSync = await db.select<{ value: string }[]>(
+          "SELECT value FROM settings WHERE key = 'auto_sync'",
+          []
+        );
+        if (newAutoSync.length > 0 && newAutoSync[0].value === "false") {
+          setAutoSync(false);
+        }
+        const newAutoSyncTime = await db.select<{ value: string }[]>(
+          "SELECT value FROM settings WHERE key = 'auto_sync_time'",
+          []
+        );
+        if (newAutoSyncTime.length > 0) {
+          setAutoSyncTime(Number(newAutoSyncTime[0].value));
+        }
+      } catch(e) {
+        console.error("Couldn't load settings", e);
+      }
+    }
+    go();
+  }, []);
+
+  function attemptSync() {
+    console.log("stubbed attempt sync - will likely do an `invoke`");
+    setCountDown(autoSyncTime);
+  }
+
+  useEffect(() => {
+    console.log("autoSync");
+    if (!autoSync && autoSyncThreadRef.current) {
+      console.log("no autoSync yet thread");
+      // remove and cancel thread
+      clearInterval(autoSyncThreadRef.current);
+      clearInterval(countDownThreadRef.current);
+      autoSyncThreadRef.current = null;
+      countDownThreadRef.current = null;
+      setCountDown(null);
+    } else if (autoSync && !autoSyncThreadRef.current) {
+      console.log("autoSync yet no thread");
+      // create thread
+      autoSyncThreadRef.current = setInterval(attemptSync, autoSyncTime * 1000);
+      // setCountDown(autoSyncTime);
+      countDownThreadRef.current = setInterval(() => setCountDown(countDown - 1), 1000);
+    } else if (autoSync && autoSyncThreadRef.current) {
+      console.log("autoSync time change", autoSyncThreadRef.current, autoSyncTime);
+      // adjust interval time
+      clearInterval(autoSyncThreadRef.current);
+      clearInterval(countDownThreadRef.current);
+      autoSyncThreadRef.current = setInterval(attemptSync, autoSyncTime * 1000);
+      countDownThreadRef.current = setInterval(() => setCountDown(countDown - 1), 1000);
+    }
+  }, [autoSync, autoSyncTime]);
+
   function changeColorScheme(c: ColorScheme) {
-    console.log("setting color scheme", c);
     setColorScheme(c);
     async function go() {
       try {
@@ -303,10 +367,42 @@ function ArbitrarySettings({ colorScheme, setColorScheme }: ArbitrarySettingsPro
     go();
   }
 
+  function changeAutoSync(a: boolean) {
+    setAutoSync(a)
+    async function go() {
+      try {
+        const db = await Database.load(__LOCAL_DB);
+        db.execute(
+          "INSERT INTO settings (key, value) VALUES ('auto_sync', $1) ON CONFLICT(key) DO UPDATE SET value = $1",
+          [String(a)]
+        );
+      } catch(e) {
+        console.error("Couldn't save auto sync", e);
+      }
+    }
+    go();
+  }
+
+  function changeAutoSyncTime(a: number) {
+    setAutoSyncTime(a)
+    async function go() {
+      try {
+        const db = await Database.load(__LOCAL_DB);
+        db.execute(
+          "INSERT INTO settings (key, value) VALUES ('auto_sync_time', $1) ON CONFLICT(key) DO UPDATE SET value = $1",
+          [String(a)]
+        );
+      } catch(e) {
+        console.error("Couldn't save auto sync time", e);
+      }
+    }
+    go();
+  }
+
   return (
     <>
-      <Switch label="Automatically Synchronize" />
-      <NumberInput label="Synchronization Interval (ms)" value={500} />
+      <Switch checked={autoSync} onChange={e => changeAutoSync(e.currentTarget.checked)} label="Automatically Synchronize" />
+      <NumberInput value={autoSyncTime} onChange={e => changeAutoSyncTime(e)} label="Synchronization Interval (ms)" />
       <Button>Synchronize Now</Button>
       <Divider />
       <Title order={2}>Additional Settings</Title>
