@@ -1,14 +1,11 @@
-use tauri_plugin_sql::{Migration, MigrationKind};
+use tauri::State;
+use tauri_plugin_sql::{Migration, MigrationKind, MigrationList, DbInstances, DbPool};
+use lazy_static::lazy_static;
+use sqlx::{Connection};
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    let migrations = vec![
+lazy_static! {
+    static ref MIGRATIONS: MigrationList = MigrationList(vec![
         Migration {
             version: 1,
             description: "create_initial_tables",
@@ -142,17 +139,74 @@ BEGIN
 END;
 ",
         },
-    ];
+    ]);
+}
 
+#[derive(sqlx::FromRow, Debug, Clone)]
+struct RemoteServer {
+    host: String,
+    port: u16,
+    db: String,
+    user: String,
+    password: String,
+    db_type: String,
+}
+
+// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+#[tauri::command]
+async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), String> {
+    let instances = db_instances.0.read().await;
+
+    let db = instances.get("sqlite:scriptorium.db").ok_or_else(|| "database not loaded".to_string())?;
+
+    match db {
+        DbPool::Sqlite(pool) => {
+            let saved_dbs: Vec<RemoteServer> = sqlx::query_as("SELECT host, port, db, user, password, db_type FROM remote_servers")
+                .fetch_all(pool)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            println!("Saved rows: {:?}", saved_dbs);
+
+            Ok(())
+        }
+        _ => Err("unexpected database".to_string()),
+    }
+}
+
+#[tauri::command]
+async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Result<bool, String> {
+    let instances = db_instances.0.read().await;
+
+    let db = instances.get("sqlite:scriptorium.db").ok_or_else(|| "database not loaded".to_string())?;
+
+    match db {
+        DbPool::Sqlite(pool) => {
+            let saved_db: RemoteServer = sqlx::query_as("SELECT host, port, db, user, password, db_type FROM remote_servers WHERE id = ?")
+                .bind(db_id)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            println!("Saved row: {:?}", saved_db);
+
+            Ok(true)
+        }
+        _ => Err("unexpected database".to_string()),
+    }
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_sql::Builder::new().build())
+        // .plugin(tauri_plugin_sql::Builder::new().build())
         .plugin(
             tauri_plugin_sql::Builder::default()
-                .add_migrations("sqlite:scriptorium.db", migrations)
+                .add_migrations("sqlite:scriptorium.db", (*MIGRATIONS).0.clone())
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![sync_databases])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

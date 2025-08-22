@@ -40,9 +40,13 @@ const defaultRemoteServer = {
 type SettingsProps = {
   colorScheme: ColorScheme;
   setColorScheme: React.Dispatch<React.SetStateAction<ColorScheme>>;
+  autoSync: boolean;
+  setAutoSync: React.Dispatch<React.SetStateAction<boolean>>;
+  autoSyncTime: number;
+  setAutoSyncTime: React.Dispatch<React.SetStateAction<number>>;
 }
 
-function Settings({ colorScheme, setColorScheme }: SettingsProps) {
+function Settings({ colorScheme, setColorScheme, autoSync, setAutoSync, autoSyncTime, setAutoSyncTime }: SettingsProps) {
   const [newRemoteServer, setNewRemoteServer] = useState<RemoteServer>(defaultRemoteServer);
   const [remoteServers, setRemoteServers] = useState<(RemoteServer & {id: string, editing: boolean})[] | null>(null);
 
@@ -276,7 +280,14 @@ function Settings({ colorScheme, setColorScheme }: SettingsProps) {
         { remoteServers ? remoteServers.map(viewRemoteServer) : <Loader /> }
       </Grid>
       <Divider label="Synchronization Settings" />
-      <ArbitrarySettings colorScheme={colorScheme} setColorScheme={setColorScheme} />
+      <ArbitrarySettings
+        colorScheme={colorScheme}
+        setColorScheme={setColorScheme}
+        autoSync={autoSync}
+        setAutoSync={setAutoSync}
+        autoSyncTime={autoSyncTime}
+        setAutoSyncTime={setAutoSyncTime}
+      />
     </Stack>
   );
 }
@@ -284,72 +295,13 @@ function Settings({ colorScheme, setColorScheme }: SettingsProps) {
 type ArbitrarySettingsProps = {
   colorScheme: ColorScheme;
   setColorScheme: React.Dispatch<React.SetStateAction<ColorScheme>>;
+  autoSync: boolean;
+  setAutoSync: React.Dispatch<React.SetStateAction<boolean>>;
+  autoSyncTime: number;
+  setAutoSyncTime: React.Dispatch<React.SetStateAction<number>>;
 }
 
-function ArbitrarySettings({ colorScheme, setColorScheme }: ArbitrarySettingsProps) {
-  const [autoSync, setAutoSync] = useState<boolean>(true);
-  const [autoSyncTime, setAutoSyncTime] = useState<number>(5);
-  const [countDown, setCountDown] = useState<number | null>(5);
-  const autoSyncThreadRef = useRef(null);
-  const countDownThreadRef = useRef(null);
-
-  // may need a ref to manage threads
-
-  useEffect(() => {
-    async function go() {
-      try {
-        const db = await Database.load(__LOCAL_DB);
-        const newAutoSync = await db.select<{ value: string }[]>(
-          "SELECT value FROM settings WHERE key = 'auto_sync'",
-          []
-        );
-        if (newAutoSync.length > 0 && newAutoSync[0].value === "false") {
-          setAutoSync(false);
-        }
-        const newAutoSyncTime = await db.select<{ value: string }[]>(
-          "SELECT value FROM settings WHERE key = 'auto_sync_time'",
-          []
-        );
-        if (newAutoSyncTime.length > 0) {
-          setAutoSyncTime(Number(newAutoSyncTime[0].value));
-        }
-      } catch(e) {
-        console.error("Couldn't load settings", e);
-      }
-    }
-    go();
-  }, []);
-
-  function attemptSync() {
-    console.log("stubbed attempt sync - will likely do an `invoke`");
-    setCountDown(autoSyncTime);
-  }
-
-  useEffect(() => {
-    console.log("autoSync");
-    if (!autoSync && autoSyncThreadRef.current) {
-      console.log("no autoSync yet thread");
-      // remove and cancel thread
-      clearInterval(autoSyncThreadRef.current);
-      clearInterval(countDownThreadRef.current);
-      autoSyncThreadRef.current = null;
-      countDownThreadRef.current = null;
-      setCountDown(null);
-    } else if (autoSync && !autoSyncThreadRef.current) {
-      console.log("autoSync yet no thread");
-      // create thread
-      autoSyncThreadRef.current = setInterval(attemptSync, autoSyncTime * 1000);
-      // setCountDown(autoSyncTime);
-      countDownThreadRef.current = setInterval(() => setCountDown(countDown - 1), 1000);
-    } else if (autoSync && autoSyncThreadRef.current) {
-      console.log("autoSync time change", autoSyncThreadRef.current, autoSyncTime);
-      // adjust interval time
-      clearInterval(autoSyncThreadRef.current);
-      clearInterval(countDownThreadRef.current);
-      autoSyncThreadRef.current = setInterval(attemptSync, autoSyncTime * 1000);
-      countDownThreadRef.current = setInterval(() => setCountDown(countDown - 1), 1000);
-    }
-  }, [autoSync, autoSyncTime]);
+function ArbitrarySettings({ colorScheme, setColorScheme, autoSync, setAutoSync, autoSyncTime, setAutoSyncTime }: ArbitrarySettingsProps) {
 
   function changeColorScheme(c: ColorScheme) {
     setColorScheme(c);
@@ -402,7 +354,7 @@ function ArbitrarySettings({ colorScheme, setColorScheme }: ArbitrarySettingsPro
   return (
     <>
       <Switch checked={autoSync} onChange={e => changeAutoSync(e.currentTarget.checked)} label="Automatically Synchronize" />
-      <NumberInput value={autoSyncTime} onChange={e => changeAutoSyncTime(e)} label="Synchronization Interval (ms)" />
+      <NumberInput value={autoSyncTime} onChange={e => changeAutoSyncTime(e)} label="Seconds Between Synchronizations" />
       <Button>Synchronize Now</Button>
       <Divider />
       <Title order={2}>Additional Settings</Title>
