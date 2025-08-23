@@ -4,10 +4,12 @@ import Nav from "./Nav";
 import { type ColorScheme } from "./App";
 import Document from "./Document";
 import { useState, useEffect, useRef } from "react";
-import { Switch, Divider, Burger, TextInput, Button, Typography, ActionIcon, Modal, Loader, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, useComputedColorScheme } from "@mantine/core";
+import { Switch, Table, Divider, Burger, TextInput, Button, Typography, Alert, ActionIcon, Modal, Loader, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, useComputedColorScheme } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconSettings, IconPlus, IconCheck, IconTrash, IconCancel, IconEdit } from "@tabler/icons-react";
 import Database from "@tauri-apps/plugin-sql";
+import { invoke } from "@tauri-apps/api/core";
+import "./Settings.css";
 
 type DatabaseType = "mysql" | "postgresql";
 
@@ -48,7 +50,7 @@ type SettingsProps = {
 
 function Settings({ colorScheme, setColorScheme, autoSync, setAutoSync, autoSyncTime, setAutoSyncTime }: SettingsProps) {
   const [newRemoteServer, setNewRemoteServer] = useState<RemoteServer>(defaultRemoteServer);
-  const [remoteServers, setRemoteServers] = useState<(RemoteServer & {id: string, editing: boolean})[] | null>(null);
+  const [remoteServers, setRemoteServers] = useState<(RemoteServer & {id: string, editing: boolean, verified: boolean | string | null})[] | null>(null);
 
   function actuallyReload() {
     async function go() {
@@ -58,7 +60,18 @@ function Settings({ colorScheme, setColorScheme, autoSync, setAutoSync, autoSync
           "SELECT id, host, port, db, user, password, db_type AS dbType FROM remote_servers",
           []
         );
-        setRemoteServers(ss.map(s => ({ ...s, editing: false })));
+        setRemoteServers(ss.map(s => ({ ...s, editing: false, verified: null })));
+
+        for (const s of ss) {
+          let verified;
+          try {
+            verified = await invoke("check_database", { dbId: s.id });
+          } catch(e) {
+            verified = e;
+          }
+          console.log("verified", verified);
+          setRemoteServers(ss.map(s_ => s_.id === s.id ? { ...s_, verified: verified } : s_));
+        }
       } catch(e) {
         console.error("Fetching remote servers Failed", e);
       }
@@ -89,11 +102,11 @@ function Settings({ colorScheme, setColorScheme, autoSync, setAutoSync, autoSync
     go();
   }
 
-  function editRemoteServer(newS: RemoteServer & { id: string, editing: boolean }) {
+  function editRemoteServer(newS: RemoteServer & { id: string, editing: boolean, verified: boolean | string | null }) {
     setRemoteServers(remoteServers.map(s => s.id === newS.id ? { ...s, ...newS } : { ...s, editing: false }));
   }
 
-  function viewRemoteServer(s: RemoteServer & { id: string, editing: boolean }) {
+  function viewRemoteServer(s: RemoteServer & { id: string, editing: boolean, verified: boolean | string | null }) {
     function saveRemoteServer() {
       async function go() {
         try {
@@ -128,8 +141,8 @@ function Settings({ colorScheme, setColorScheme, autoSync, setAutoSync, autoSync
     }
     if (s.editing) {
       return (
-        <React.Fragment key={s.id}>
-          <Grid.Col span={2}>
+        <Table.Tr key={s.id}>
+          <Table.Td span={2}>
             <NativeSelect
               label="Database Type"
               value={s.dbType}
@@ -141,77 +154,87 @@ function Settings({ colorScheme, setColorScheme, autoSync, setAutoSync, autoSync
               }}
               data={[{label: "MySQL", value: "mysql"}, {label: "PostgreSQL", value: "mysql"}]}
             />
-          </Grid.Col>
-          <Grid.Col span={2}>
+          </Table.Td>
+          <Table.Td span={2}>
             <TextInput
               label="Host"
               value={s.host}
               onChange={e => editRemoteServer({ ...s, host: e.currentTarget.value })}
             />
-          </Grid.Col>
-          <Grid.Col span={1}>
+          </Table.Td>
+          <Table.Td span={1}>
             <NumberInput
               label="Port"
               value={s.port}
               onChange={e => editRemoteServer({ ...s, port: Number(e.currentTarget.value) })}
             />
-          </Grid.Col>
-          <Grid.Col span={2}>
+          </Table.Td>
+          <Table.Td span={2}>
             <TextInput
               label="Database"
               value={s.db}
               onChange={e => editRemoteServer({ ...s, db: e.currentTarget.value })}
             />
-          </Grid.Col>
-          <Grid.Col span={2}>
+          </Table.Td>
+          <Table.Td span={2}>
             <TextInput
               label="Username"
               value={s.user}
               onChange={e => editRemoteServer({ ...s, user: e.currentTarget.value })}
             />
-          </Grid.Col>
-          <Grid.Col span={2}>
+          </Table.Td>
+          <Table.Td span={2}>
             <PasswordInput
               label="Password"
               value={s.password}
               onChange={e => editRemoteServer({ ...s, password: e.currentTarget.value })}
             />
-          </Grid.Col>
-          <Grid.Col span={1} style={{display: "flex", alignItems: "center", justifyContent: "space-around"}}>
+          </Table.Td>
+          <Table.Td span={1} style={{display: "flex", alignItems: "center", justifyContent: "space-around"}}>
             <ActionIcon color="green" onClick={saveRemoteServer}><IconCheck /></ActionIcon>
             <ActionIcon color="red" onClick={deleteRemoteServer}><IconTrash /></ActionIcon>
             <ActionIcon color="gray" onClick={() => {
               editRemoteServer({ ...s, editing: false });
               actuallyReload();
             }}><IconCancel /></ActionIcon>
-          </Grid.Col>
-        </React.Fragment>
+          </Table.Td>
+        </Table.Tr>
       );
     } else {
+      console.log(s.verified);
       return (
-        <React.Fragment key={s.id}>
-          <Grid.Col span={2}>
+        <Table.Tr key={s.id}>
+          <Table.Td span={2}>
             { s.dbType === "mysql" ? "MySQL" : "PostgreSQL" }
-          </Grid.Col>
-          <Grid.Col span={2}>
+          </Table.Td>
+          <Table.Td span={2}>
             { s.host }
-          </Grid.Col>
-          <Grid.Col span={1}>
+          </Table.Td>
+          <Table.Td span={1}>
             { s.port }
-          </Grid.Col>
-          <Grid.Col span={2}>
+          </Table.Td>
+          <Table.Td span={2}>
             { s.db }
-          </Grid.Col>
-          <Grid.Col span={2}>
+          </Table.Td>
+          <Table.Td span={2}>
             { s.user }
-          </Grid.Col>
-          <Grid.Col span={2}>
+          </Table.Td>
+          <Table.Td span={2}>
             *****
-          </Grid.Col>
-          <Grid.Col span={1} style={{display: "flex", alignItems: "center", justifyContent: "space-around"}}>
+          </Table.Td>
+          <Table.Td span={1} style={{display: "flex", alignItems: "center", justifyContent: "space-around"}}>
             <ActionIcon onClick={() => editRemoteServer({ ...s, editing: true })}><IconEdit /></ActionIcon>
-          </Grid.Col>
-        </React.Fragment>
+          </Table.Td>
+          <Table.Td>
+            {
+              typeof s.verified === "string"
+                ? (<Alert color="red" title="Verification Issue">{s.verified}</Alert>)
+                : s.verified === false
+                ? (<Alert color="red" title="Verification Issue"></Alert>)
+                : null
+            }
+          </Table.Td>
+        </Table.Tr>
       );
     }
   }
@@ -276,9 +299,23 @@ function Settings({ colorScheme, setColorScheme, autoSync, setAutoSync, autoSync
         </Grid.Col>
       </Grid>
       <Title order={3}>Saved Remote Servers</Title>
-      <Grid>
-        { remoteServers ? remoteServers.map(viewRemoteServer) : <Loader /> }
-      </Grid>
+      <Table>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Database Type</Table.Th>
+            <Table.Th>Host</Table.Th>
+            <Table.Th>Port</Table.Th>
+            <Table.Th>Database</Table.Th>
+            <Table.Th>Username</Table.Th>
+            <Table.Th>Password</Table.Th>
+            <Table.Th>Actions</Table.Th>
+            <Table.Th>Verification Issues</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          { remoteServers ? remoteServers.map(viewRemoteServer) : <Loader /> }
+        </Table.Tbody>
+      </Table>
       <Divider label="Synchronization Settings" />
       <ArbitrarySettings
         colorScheme={colorScheme}

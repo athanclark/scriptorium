@@ -1,7 +1,8 @@
 use tauri::State;
 use tauri_plugin_sql::{Migration, MigrationKind, MigrationList, DbInstances, DbPool};
 use lazy_static::lazy_static;
-use sqlx::{Connection};
+use log::{warn, info};
+use sqlx::{Connection, ConnectOptions, postgres::PgConnectOptions, mysql::MySqlConnectOptions};
 
 
 lazy_static! {
@@ -190,9 +191,38 @@ async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Re
 
             println!("Saved row: {:?}", saved_db);
 
-            Ok(true)
+            match saved_db.db_type.as_str() {
+                "mysql" => {
+                    let conn = MySqlConnectOptions::new()
+                        .host(&saved_db.host)
+                        .username(&saved_db.user)
+                        .password(&saved_db.password)
+                        .port(saved_db.port)
+                        .database(&saved_db.db)
+                        .connect()
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    Ok(true)
+                },
+                "postgresql" => {
+                    let conn = PgConnectOptions::new()
+                        .host(&saved_db.host)
+                        .username(&saved_db.user)
+                        .password(&saved_db.password)
+                        .port(saved_db.port)
+                        .database(&saved_db.db)
+                        .connect()
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    Ok(true)
+                },
+                _ => {
+                    warn!("Unrecognized database type: {:?}", saved_db.db_type);
+                    Ok(false)
+                }
+            }
         }
-        _ => Err("unexpected database".to_string()),
+        _ => Err("unexpected primary database".to_string()),
     }
 }
 
@@ -206,7 +236,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![sync_databases])
+        .invoke_handler(tauri::generate_handler![sync_databases, check_database])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
