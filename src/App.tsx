@@ -5,7 +5,7 @@ import Document from "./Document";
 import Settings from "./Settings";
 import { useState, useEffect, useRef } from "react";
 import { MantineProvider, AppShell, Burger, TextInput, Typography, ActionIcon, Modal, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, useComputedColorScheme } from "@mantine/core";
-import { Notifications } from "@mantine/notifications";
+import { Notifications, notifications } from "@mantine/notifications";
 import { useDisclosure } from "@mantine/hooks";
 import { IconSettings, IconPlus } from "@tabler/icons-react";
 import { invoke } from "@tauri-apps/api/core";
@@ -40,11 +40,26 @@ function App() {
   const autoSyncThreadRef = useRef(null);
   const [opened, { toggle }] = useDisclosure();
 
-  // may need a ref to manage threads
+  // NOTE: may need a ref to manage threads
+  // FIXME: I need to set the timeout manually on each invocation
 
   function attemptSync() {
     console.log("stubbed attempt sync - will likely do an `invoke`");
-    invoke("sync_databases");
+    async function go() {
+      try {
+        await invoke("sync_databases");
+      } catch(e) {
+        console.warn("sync_databases failed", e);
+        notifications.show({
+          title: "Auto Synchronization of Databases Failed",
+          message: e.join("\n") + "\n Auto synchronization turned off.",
+          color: "red",
+          autoClose: false,
+        })
+        setAutoSync(false);
+      }
+    }
+    go();
   }
 
   useEffect(() => {
@@ -85,8 +100,8 @@ function App() {
           "SELECT value FROM settings WHERE key = 'auto_sync'",
           []
         );
-        if (newAutoSync.length > 0 && newAutoSync[0].value === "false") {
-          setAutoSync(false);
+        if (newAutoSync.length > 0 && newAutoSync[0].value === "true") {
+          setAutoSync(true);
         }
         const newAutoSyncTime = await db.select<{ value: string }[]>(
           "SELECT value FROM settings WHERE key = 'auto_sync_time'",

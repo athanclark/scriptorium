@@ -1,8 +1,16 @@
 use tauri::State;
 use tauri_plugin_sql::{Migration, MigrationKind, MigrationList, DbInstances, DbPool};
 use lazy_static::lazy_static;
-use log::{warn, info};
-use sqlx::{Connection, ConnectOptions, postgres::PgConnectOptions, mysql::MySqlConnectOptions};
+use log::{warn, info, debug};
+use sqlx::{
+    Connection, 
+    ConnectOptions,
+    Pool,
+    Database,
+    postgres::{PgConnectOptions, PgPool},
+    mysql::{MySqlConnectOptions, MySqlPool},
+    migrate::{Migrate, Migrator},
+};
 
 
 lazy_static! {
@@ -145,6 +153,7 @@ END;
 
 #[derive(sqlx::FromRow, Debug, Clone)]
 struct RemoteServer {
+    id: String,
     host: String,
     port: u16,
     db: String,
@@ -155,23 +164,118 @@ struct RemoteServer {
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
-async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), String> {
+async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<String>> {
     let instances = db_instances.0.read().await;
 
-    let db = instances.get("sqlite:scriptorium.db").ok_or_else(|| "database not loaded".to_string())?;
+    let db = instances.get("sqlite:scriptorium.db").ok_or_else(|| vec!["database not loaded".to_string()])?;
 
     match db {
-        DbPool::Sqlite(pool) => {
-            let saved_dbs: Vec<RemoteServer> = sqlx::query_as("SELECT host, port, db, user, password, db_type FROM remote_servers")
-                .fetch_all(pool)
+        DbPool::Sqlite(local_conn) => {
+            let mut saved_dbs: Vec<RemoteServer> = sqlx::query_as("SELECT id, host, port, db, user, password, db_type FROM remote_servers")
+                .fetch_all(local_conn)
                 .await
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| vec![e.to_string()])?;
+            let mut changes_made = false;
 
-            println!("Saved rows: {:?}", saved_dbs);
+            let mut errors: Vec<String> = vec![];
 
-            Ok(())
+
+            let mut idx = 0;
+
+            loop {
+                debug!("Iterating");
+                debug!("Saved rows: {:?}", saved_dbs);
+
+                if saved_dbs.is_empty() {
+                    debug!("saved are empty databases");
+                    break;
+                }
+                if idx >= saved_dbs.len() {
+                    idx = 0;
+                    if !changes_made {
+                        // NOTE: no changes have been made since the last cycle - all dbs are synced
+                        break;
+                    }
+                    debug!("restarting database sync");
+                }
+
+                let saved_db = &saved_dbs[idx];
+
+                match saved_db.db_type.as_str() {
+                    "mysql" => {
+                        let conn_options = MySqlConnectOptions::new()
+                            .host(&saved_db.host)
+                            .username(&saved_db.user)
+                            .password(&saved_db.password)
+                            .port(saved_db.port)
+                            .database(&saved_db.db);
+                        let e_conn: Result<MySqlPool, String> = run_migrations_and_get_pool(conn_options).await;
+                        info!("e_conn returned");
+                        // let e_conn: Result<_, String> = MySqlPool::connect_with(conn_options).await.map_err(|e| e.to_string()).and_then(async |conn|
+                        //     Migrator::new(MIGRATIONS.clone()).await.map_err(|e| e.to_string()).and_then(async |migrator|
+                        //         migrator.run(&conn).await.map_err(|e| e.to_string()).and_then(|| conn)
+                        //     )
+                        // );
+                        match e_conn {
+                            Ok(conn) => {
+                                // TODO: migrate
+                                // let e_books = sqlx::query_as("SELECT id, modified FROM books")
+                                //     .fetch_all(local_conn)
+                                //     .await
+                                //     .map_err(|e| e.to_string());
+                                // match e_books {
+                                //     Err(e) => {errors.push(e);},
+                                //     Ok(all_local_books) => {
+                                //         let e_remote_books = sqlx::query_as("SELECT id, modified FROM books")
+                                //     }
+                                // }
+                                ()
+                                // TODO: record if changes were made
+                            },
+                            Err(e) => {
+                                errors.push(e.clone());
+                                saved_dbs.remove(idx);
+                                warn!("error, {e:?}, removing {idx}");
+                            },
+                        }
+                    },
+                    "postgresql" => {
+                        let e_conn = PgConnectOptions::new()
+                            .host(&saved_db.host)
+                            .username(&saved_db.user)
+                            .password(&saved_db.password)
+                            .port(saved_db.port)
+                            .database(&saved_db.db)
+                            .connect()
+                            .await
+                            .map_err(|e| e.to_string());
+                        match e_conn {
+                            Ok(conn) => {
+                                // TODO: migrate
+                                ()
+                                // TODO: record if changes were made
+                            },
+                            Err(e) => {
+                                errors.push(e);
+                                saved_dbs.remove(idx);
+                            },
+                        }
+                    },
+                    _ => {
+                        errors.push(format!("Unrecognized database type: {:?}", saved_db.db_type));
+                    },
+                }
+
+                idx += 1;
+            }
+
+            if errors.len() > 0 {
+                Err(errors)
+            } else {
+                Ok(())
+            }
         }
-        _ => Err("unexpected database".to_string()),
+        _ => Err(vec!["unexpected primary database".to_string()]),
     }
 }
 
@@ -183,7 +287,7 @@ async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Re
 
     match db {
         DbPool::Sqlite(pool) => {
-            let saved_db: RemoteServer = sqlx::query_as("SELECT host, port, db, user, password, db_type FROM remote_servers WHERE id = ?")
+            let saved_db: RemoteServer = sqlx::query_as("SELECT id, host, port, db, user, password, db_type FROM remote_servers WHERE id = ?")
                 .bind(db_id)
                 .fetch_one(pool)
                 .await
@@ -193,32 +297,33 @@ async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Re
 
             match saved_db.db_type.as_str() {
                 "mysql" => {
-                    let conn = MySqlConnectOptions::new()
+                    let conn_options = MySqlConnectOptions::new()
                         .host(&saved_db.host)
                         .username(&saved_db.user)
                         .password(&saved_db.password)
                         .port(saved_db.port)
-                        .database(&saved_db.db)
-                        .connect()
-                        .await
-                        .map_err(|e| e.to_string())?;
+                        .database(&saved_db.db);
+                    let conn: MySqlPool = run_migrations_and_get_pool(conn_options).await?;
+                    // let conn = MySqlPool::connect_with(conn_options).await.map_err(|e| e.to_string())?;
+                    // let migrator = Migrator::new(MIGRATIONS.clone()).await.map_err(|e| e.to_string())?;
+                    // migrator.run(&conn).await.map_err(|e| e.to_string())?;
                     Ok(true)
                 },
                 "postgresql" => {
-                    let conn = PgConnectOptions::new()
+                    let conn_options = PgConnectOptions::new()
                         .host(&saved_db.host)
                         .username(&saved_db.user)
                         .password(&saved_db.password)
                         .port(saved_db.port)
-                        .database(&saved_db.db)
-                        .connect()
-                        .await
-                        .map_err(|e| e.to_string())?;
+                        .database(&saved_db.db);
+                    let conn: PgPool = run_migrations_and_get_pool(conn_options).await?;
+                    // let conn = PgPool::connect_with(conn_options).await.map_err(|e| e.to_string())?;
+                    // let migrator = Migrator::new(MIGRATIONS.clone()).await.map_err(|e| e.to_string())?;
+                    // migrator.run(&conn).await.map_err(|e| e.to_string())?;
                     Ok(true)
                 },
                 _ => {
-                    warn!("Unrecognized database type: {:?}", saved_db.db_type);
-                    Ok(false)
+                    Err(format!("Unrecognized database type: {:?}", saved_db.db_type))
                 }
             }
         }
@@ -228,6 +333,8 @@ async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Re
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    env_logger::init();
+
     tauri::Builder::default()
         // .plugin(tauri_plugin_sql::Builder::new().build())
         .plugin(
@@ -239,4 +346,19 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![sync_databases, check_database])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+async fn run_migrations_and_get_pool<DB: Database>(
+    conn_options: <<DB as Database>::Connection as Connection>::Options,
+) -> Result<Pool<DB>, String>
+where
+    <DB as Database>::Connection: Migrate
+{
+    let conn = Pool::connect_with(conn_options).await.map_err(|e| e.to_string())?;
+    debug!("pool established");
+    let migrator = Migrator::new(MIGRATIONS.clone()).await.map_err(|e| e.to_string())?;
+    debug!("migrator created");
+    migrator.run(&conn).await.map_err(|e| e.to_string())?;
+    debug!("migrations run");
+    Ok(conn)
 }

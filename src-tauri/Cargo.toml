@@ -27,4 +27,5 @@ tauri-plugin-sql = { git = "https://github.com/athanclark/plugins-workspace.git"
 lazy_static = "1.5.0"
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "runtime-tokio-rustls", "time"] }
 log = "0.4.27"
+env_logger = "0.11.8"
 
