@@ -1,5 +1,6 @@
 use tauri::State;
 use tauri_plugin_sql::{Migration, MigrationKind, MigrationList, DbInstances, DbPool};
+use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use log::{warn, info, debug};
 use sqlx::{
@@ -7,14 +8,24 @@ use sqlx::{
     ConnectOptions,
     Pool,
     Database,
+    QueryBuilder,
+    MySql,
+    Postgres,
+    Sqlite,
+    pool::PoolOptions,
     postgres::{PgConnectOptions, PgPool},
     mysql::{MySqlConnectOptions, MySqlPool},
     migrate::{Migrate, Migrator},
 };
+use std::{
+    time::Duration,
+    str::FromStr,
+    collections::{HashMap, HashSet},
+};
 
 
 lazy_static! {
-    static ref MIGRATIONS: MigrationList = MigrationList(vec![
+    static ref SQLITE_MIGRATIONS: MigrationList = MigrationList(vec![
         Migration {
             version: 1,
             description: "create_initial_tables",
@@ -148,6 +159,129 @@ BEGIN
 END;
 ",
         },
+        Migration {
+            version: 10,
+            description: "better_auto_modify_datetime",
+            kind: MigrationKind::Up,
+            sql: "
+DROP TRIGGER IF EXISTS update_modified_books;
+CREATE TRIGGER update_modified_books
+AFTER UPDATE ON books
+FOR EACH ROW
+WHEN NEW.modified IS OLD.modified
+BEGIN
+    UPDATE books
+    SET modified = datetime('now')
+    WHERE id = NEW.id;
+END;
+DROP TRIGGER IF EXISTS update_modified_documents;
+CREATE TRIGGER update_modified_documents
+AFTER UPDATE ON documents
+FOR EACH ROW
+WHEN NEW.modified IS OLD.modified
+BEGIN
+    UPDATE documents
+    SET modified = datetime('now')
+    WHERE id = NEW.id;
+END;
+",
+        },
+    ]);
+
+    static ref MYSQL_PG_MIGRATIONS: MigrationList = MigrationList(vec![
+        Migration {
+            version: 1,
+            description: "create_initial_tables",
+            kind: MigrationKind::Up,
+            sql: "
+CREATE TABLE IF NOT EXISTS books (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    modified DATETIME NOT NULL
+);
+CREATE TABLE IF NOT EXISTS documents (
+    id TEXT PRIMARY,
+    book TEXT NOT NULL,
+    name TEXT,
+    content TEXT,
+    syntax TEXT NOT NULL,
+    modified DATETIME NOT NULL,
+    FOREIGN KEY (book)
+        REFERENCES books(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+",
+        },
+        Migration {
+            version: 2,
+            description: "create_settings_tables",
+            kind: MigrationKind::Up,
+            sql: "
+CREATE TABLE IF NOT EXISTS remote_servers (
+    id TEXT PRIMARY KEY,
+    db_type TEXT NOT NULL,
+    host TEXT NOT NULL,
+    port INTEGER NOT NULL,
+    db TEXT NOT NULL,
+    user TEXT NOT NULL,
+    password TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+",
+        },
+        Migration {
+            version: 3,
+            description: "add_icons_to_books_and_documents",
+            kind: MigrationKind::Up,
+            sql: "
+ALTER TABLE books ADD COLUMN icon TEXT;
+ALTER TABLE books ADD COLUMN icon_color TEXT;
+ALTER TABLE documents ADD COLUMN icon TEXT;
+ALTER TABLE documents ADD COLUMN icon_color TEXT;
+",
+        },
+        Migration {
+            version: 4,
+            description: "trash",
+            kind: MigrationKind::Up,
+            sql: "
+ALTER TABLE books ADD COLUMN trash INTEGER NOT NULL DEFAULT 0
+CHECK (trash IN (0, 1));
+",
+        },
+        Migration {
+            version: 5,
+            description: "permanently_deleted",
+            kind: MigrationKind::Up,
+            sql: "
+CREATE TABLE IF NOT EXISTS deleted (
+    id TEXT PRIMARY KEY
+);
+",
+        },
+        Migration {
+            version: 6,
+            description: "delete_trigger_for_permanently_deleted",
+            kind: MigrationKind::Up,
+            sql: "
+CREATE TRIGGER populate_deleted_book
+AFTER DELETE ON books
+FOR EACH ROW
+BEGIN
+    INSERT INTO deleted (id) VALUES (OLD.id);
+END;
+CREATE TRIGGER populate_deleted_document
+AFTER DELETE ON documents
+FOR EACH ROW
+BEGIN
+    INSERT INTO deleted (id) VALUES (OLD.id);
+END;
+",
+        },
     ]);
 }
 
@@ -162,6 +296,165 @@ struct RemoteServer {
     db_type: String,
 }
 
+#[derive(sqlx::FromRow, Debug, Clone)]
+struct ValueString {
+    value: String,
+}
+
+#[derive(sqlx::FromRow, Debug, Clone)]
+struct IdAndModified {
+    id: String,
+    modified: DateTime<Utc>,
+}
+
+#[derive(sqlx::FromRow, Debug, Clone)]
+struct Id {
+    id: String,
+}
+
+const DEFAULT_AUTO_SYNC_TIME: u32 = 5;
+
+// async fn actually_sync_databases<'b, T: Database>(
+async fn actually_sync_databases<'e, 'c: 'e, 'd, 'a, E, DB>(
+    local_conn: &Pool<Sqlite>,
+    // remote_conn: &'b Pool<T>,
+    remote_conn: E,
+) -> Result<bool, String>
+where
+    E: 'e + sqlx::Executor<'c, Database = DB> + Copy,
+    DB: Database,
+    DateTime<Utc>: sqlx::Decode<'d, DB>,
+    String: sqlx::Decode<'d, DB>,
+    String: sqlx::Encode<'a, DB>,
+    DateTime<Utc>: sqlx::Type<DB>,
+    String: sqlx::Type<DB>,
+    <DB as Database>::Arguments<'a>: sqlx::IntoArguments<'a, DB>,
+    IdAndModified: for<'r> sqlx::FromRow<'r, DB::Row>,
+    Id: for<'r> sqlx::FromRow<'r, DB::Row>,
+{
+    let mut has_modified = false;
+
+    // NOTE: Sync Deleted Books /////////////////////////////////
+    let all_local_deletions: Vec<Id> =
+        sqlx::query_as("SELECT id FROM deleted")
+        .fetch_all(local_conn)
+        .await
+        .map_err(|e| e.to_string())?;
+    let all_remote_deletions: Vec<Id> =
+        sqlx::query_as("SELECT id FROM deleted")
+        .fetch_all(remote_conn)
+        .await
+        .map_err(|e| e.to_string())?;
+    let all_local_deletions: HashSet<String> = all_local_deletions
+        .into_iter()
+        .map(|kv| kv.id)
+        .collect();
+    let all_remote_deletions: HashSet<String> = all_remote_deletions
+        .into_iter()
+        .map(|kv| kv.id)
+        .collect();
+    let local_to_delete = all_remote_deletions.difference(&all_local_deletions);
+    let remote_to_delete = all_local_deletions.difference(&all_remote_deletions);
+
+    // NOTE: Remove from local first
+    let mut add_to_delete_table = QueryBuilder::<Sqlite>::new("INSERT INTO deleted (id)");
+    add_to_delete_table.push_values(local_to_delete.clone(), |mut builder, to_delete| {
+        has_modified = true;
+        builder.push_bind(to_delete);
+    });
+    add_to_delete_table.build().execute(local_conn).await.map_err(|e| e.to_string())?;
+
+    let mut remove_from_documents = QueryBuilder::<Sqlite>::new("DELETE FROM documents WHERE id IN (");
+    let mut sep = remove_from_documents.separated(", ");
+    for id in local_to_delete.clone() {
+        has_modified = true;
+        sep.push_bind(id);
+    }
+    sep.push_unseparated(")");
+    remove_from_documents.build().execute(local_conn).await.map_err(|e| e.to_string())?;
+
+    let mut remove_from_books = QueryBuilder::<Sqlite>::new("DELETE FROM books WHERE id IN (");
+    let mut sep = remove_from_books.separated(", ");
+    for id in local_to_delete {
+        has_modified = true;
+        sep.push_bind(id);
+    }
+    sep.push_unseparated(")");
+    remove_from_books.build().execute(local_conn).await.map_err(|e| e.to_string())?;
+    
+    // NOTE: Remove remote second
+    let mut add_to_delete_table = QueryBuilder::<DB>::new("INSERT INTO deleted (id)");
+    add_to_delete_table.push_values(remote_to_delete.clone(), |mut builder, to_delete| {
+        has_modified = true;
+        builder.push_bind(to_delete);
+    });
+    add_to_delete_table.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
+
+    let mut remove_from_documents = QueryBuilder::<DB>::new("DELETE FROM documents WHERE id IN (");
+    let mut sep = remove_from_documents.separated(", ");
+    for id in remote_to_delete.clone() {
+        has_modified = true;
+        sep.push_bind(id);
+    }
+    sep.push_unseparated(")");
+    remove_from_documents.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
+
+    let mut remove_from_books = QueryBuilder::<DB>::new("DELETE FROM books WHERE id IN (");
+    let mut sep = remove_from_books.separated(", ");
+    for id in remote_to_delete {
+        has_modified = true;
+        sep.push_bind(id);
+    }
+    sep.push_unseparated(")");
+    remove_from_books.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
+
+    // NOTE: Sync Existing Books ///////////////////////////////
+    let all_local_books: Vec<IdAndModified> =
+        sqlx::query_as("SELECT id, modified FROM books")
+        .fetch_all(local_conn)
+        .await
+        .map_err(|e| e.to_string())?;
+    let all_remote_books: Vec<IdAndModified> =
+        sqlx::query_as("SELECT id, modified FROM books")
+        .fetch_all(remote_conn)
+        .await
+        .map_err(|e| e.to_string())?;
+    let all_local_books: HashMap<String, DateTime<Utc>> = all_local_books
+        .into_iter()
+        .map(|kv| (kv.id, kv.modified))
+        .collect();
+    let all_remote_books: HashMap<String, DateTime<Utc>> = all_remote_books
+        .into_iter()
+        .map(|kv| (kv.id, kv.modified))
+        .collect();
+    // let on_local_not_remote = 
+
+    Ok(has_modified) // NOTE: return if changes were made
+    // INFO: Get all remote books not in the local database
+    // 
+    // let mut query_builder = QueryBuilder::<MySql>::new("SELECT id, modified FROM books");
+    // if !all_local_books.is_empty() {
+    //     query_builder.push(" WHERE id NOT IN (");
+    //     let mut sep = query_builder.separated(", ");
+    //     for local_book in &all_local_books {
+    //         sep.push_bind(local_book.id.clone());
+    //     }
+    //     sep.push_unseparated(")");
+    // }
+    // let e_remote_books: Result<Vec<IdAndModified>, String> = query_builder
+    //     .build_query_as()
+    //     .fetch_all(&conn)
+    //     .await
+    //     .map_err(|e| e.to_string());
+    // match e_remote_books {
+    //     Err(e) => {errors.push(e);},
+    //     Ok(new_remote_books) if !new_remote_books.is_empty() => {
+    //         ()               
+    //     },
+    //     _ => {},
+    // }
+}
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<String>> {
@@ -171,6 +464,17 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
 
     match db {
         DbPool::Sqlite(local_conn) => {
+            let auto_sync_time: u32 = sqlx::query_as("SELECT value FROM settings WHERE key = 'auto_sync_time'")
+                .fetch_all(local_conn)
+                .await
+                .map_err(|e| vec![e.to_string()])
+                .and_then(|vs: Vec<ValueString>| {
+                    if vs.len() > 0 {
+                        u32::from_str(&vs[0].value).map_err(|e| vec![e.to_string()])
+                    } else {
+                        Ok(5)
+                    }
+                })?;
             let mut saved_dbs: Vec<RemoteServer> = sqlx::query_as("SELECT id, host, port, db, user, password, db_type FROM remote_servers")
                 .fetch_all(local_conn)
                 .await
@@ -178,7 +482,27 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
             let mut changes_made = false;
 
             let mut errors: Vec<String> = vec![];
-
+            // let pack_error = async |f, def| {
+            //     let res = f().await;
+            //     match res {
+            //         Err(e) => {
+            //             errors.push(e);
+            //             def
+            //         }
+            //         Ok(x) => x,
+            //     }
+            // };
+            // let pack_and_run_error = async |f, g, def| {
+            //     let res = f().await;
+            //     match res {
+            //         Err(e) => {
+            //             errors.push(e);
+            //             g().await;
+            //             def
+            //         }
+            //         Ok(x) => x,
+            //     }
+            // };
 
             let mut idx = 0;
 
@@ -209,28 +533,21 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
                             .password(&saved_db.password)
                             .port(saved_db.port)
                             .database(&saved_db.db);
-                        let e_conn: Result<MySqlPool, String> = run_migrations_and_get_pool(conn_options).await;
+                        let e_conn: Result<MySqlPool, String> = run_migrations_and_get_pool(
+                            conn_options,
+                            MYSQL_PG_MIGRATIONS.clone(),
+                            auto_sync_time,
+                        ).await;
                         info!("e_conn returned");
-                        // let e_conn: Result<_, String> = MySqlPool::connect_with(conn_options).await.map_err(|e| e.to_string()).and_then(async |conn|
-                        //     Migrator::new(MIGRATIONS.clone()).await.map_err(|e| e.to_string()).and_then(async |migrator|
-                        //         migrator.run(&conn).await.map_err(|e| e.to_string()).and_then(|| conn)
-                        //     )
-                        // );
                         match e_conn {
                             Ok(conn) => {
-                                // TODO: migrate
-                                // let e_books = sqlx::query_as("SELECT id, modified FROM books")
-                                //     .fetch_all(local_conn)
-                                //     .await
-                                //     .map_err(|e| e.to_string());
-                                // match e_books {
-                                //     Err(e) => {errors.push(e);},
-                                //     Ok(all_local_books) => {
-                                //         let e_remote_books = sqlx::query_as("SELECT id, modified FROM books")
-                                //     }
-                                // }
-                                ()
-                                // TODO: record if changes were made
+                                let e_caused_changes = actually_sync_databases(&local_conn, &conn).await;
+                                match e_caused_changes {
+                                    Err(e) => {errors.push(e);},
+                                    Ok(caused_changes) => {
+                                        changes_made = caused_changes || changes_made;
+                                    }
+                                }
                             },
                             Err(e) => {
                                 errors.push(e.clone());
@@ -240,20 +557,26 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
                         }
                     },
                     "postgresql" => {
-                        let e_conn = PgConnectOptions::new()
+                        let conn_options = PgConnectOptions::new()
                             .host(&saved_db.host)
                             .username(&saved_db.user)
                             .password(&saved_db.password)
                             .port(saved_db.port)
-                            .database(&saved_db.db)
-                            .connect()
-                            .await
-                            .map_err(|e| e.to_string());
+                            .database(&saved_db.db);
+                        let e_conn: Result<PgPool, String> = run_migrations_and_get_pool(
+                            conn_options,
+                            MYSQL_PG_MIGRATIONS.clone(),
+                            auto_sync_time,
+                        ).await;
                         match e_conn {
                             Ok(conn) => {
-                                // TODO: migrate
-                                ()
-                                // TODO: record if changes were made
+                                let e_caused_changes = actually_sync_databases(&local_conn, &conn).await;
+                                match e_caused_changes {
+                                    Err(e) => {errors.push(e);},
+                                    Ok(caused_changes) => {
+                                        changes_made = caused_changes || changes_made;
+                                    }
+                                }
                             },
                             Err(e) => {
                                 errors.push(e);
@@ -286,10 +609,21 @@ async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Re
     let db = instances.get("sqlite:scriptorium.db").ok_or_else(|| "database not loaded".to_string())?;
 
     match db {
-        DbPool::Sqlite(pool) => {
+        DbPool::Sqlite(local_conn) => {
+            let auto_sync_time: u32 = sqlx::query_as("SELECT value FROM settings WHERE key = 'auto_sync_time'")
+                .fetch_all(local_conn)
+                .await
+                .map_err(|e| e.to_string())
+                .and_then(|vs: Vec<ValueString>| {
+                    if vs.len() > 0 {
+                        u32::from_str(&vs[0].value).map_err(|e| e.to_string())
+                    } else {
+                        Ok(5)
+                    }
+                })?;
             let saved_db: RemoteServer = sqlx::query_as("SELECT id, host, port, db, user, password, db_type FROM remote_servers WHERE id = ?")
                 .bind(db_id)
-                .fetch_one(pool)
+                .fetch_one(local_conn)
                 .await
                 .map_err(|e| e.to_string())?;
 
@@ -303,7 +637,11 @@ async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Re
                         .password(&saved_db.password)
                         .port(saved_db.port)
                         .database(&saved_db.db);
-                    let conn: MySqlPool = run_migrations_and_get_pool(conn_options).await?;
+                    let conn: MySqlPool = run_migrations_and_get_pool(
+                        conn_options,
+                        MYSQL_PG_MIGRATIONS.clone(),
+                        auto_sync_time,
+                    ).await?;
                     // let conn = MySqlPool::connect_with(conn_options).await.map_err(|e| e.to_string())?;
                     // let migrator = Migrator::new(MIGRATIONS.clone()).await.map_err(|e| e.to_string())?;
                     // migrator.run(&conn).await.map_err(|e| e.to_string())?;
@@ -316,7 +654,11 @@ async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Re
                         .password(&saved_db.password)
                         .port(saved_db.port)
                         .database(&saved_db.db);
-                    let conn: PgPool = run_migrations_and_get_pool(conn_options).await?;
+                    let conn: PgPool = run_migrations_and_get_pool(
+                        conn_options,
+                        MYSQL_PG_MIGRATIONS.clone(),
+                        auto_sync_time,
+                    ).await?;
                     // let conn = PgPool::connect_with(conn_options).await.map_err(|e| e.to_string())?;
                     // let migrator = Migrator::new(MIGRATIONS.clone()).await.map_err(|e| e.to_string())?;
                     // migrator.run(&conn).await.map_err(|e| e.to_string())?;
@@ -339,7 +681,7 @@ pub fn run() {
         // .plugin(tauri_plugin_sql::Builder::new().build())
         .plugin(
             tauri_plugin_sql::Builder::default()
-                .add_migrations("sqlite:scriptorium.db", (*MIGRATIONS).0.clone())
+                .add_migrations("sqlite:scriptorium.db", SQLITE_MIGRATIONS.0.clone())
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
@@ -350,13 +692,19 @@ pub fn run() {
 
 async fn run_migrations_and_get_pool<DB: Database>(
     conn_options: <<DB as Database>::Connection as Connection>::Options,
+    migrations: MigrationList,
+    auto_sync_time: u32,
 ) -> Result<Pool<DB>, String>
 where
     <DB as Database>::Connection: Migrate
 {
-    let conn = Pool::connect_with(conn_options).await.map_err(|e| e.to_string())?;
+    let conn = PoolOptions::new()
+        .acquire_timeout(Duration::from_secs(auto_sync_time as u64 - 1))
+        .connect_with(conn_options)
+        .await
+        .map_err(|e| e.to_string())?;
     debug!("pool established");
-    let migrator = Migrator::new(MIGRATIONS.clone()).await.map_err(|e| e.to_string())?;
+    let migrator = Migrator::new(migrations).await.map_err(|e| e.to_string())?;
     debug!("migrator created");
     migrator.run(&conn).await.map_err(|e| e.to_string())?;
     debug!("migrations run");
