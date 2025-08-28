@@ -1,3 +1,8 @@
+mod types;
+use crate::types::{RemoteServer, ValueString};
+mod mysql;
+use crate::mysql::actually_sync_databases_mysql;
+
 use tauri::State;
 use tauri_plugin_sql::{Migration, MigrationKind, MigrationList, DbInstances, DbPool};
 use chrono::{DateTime, Utc};
@@ -20,7 +25,6 @@ use sqlx::{
 use std::{
     time::Duration,
     str::FromStr,
-    collections::{HashMap, HashSet},
 };
 
 
@@ -285,175 +289,8 @@ END;
     ]);
 }
 
-#[derive(sqlx::FromRow, Debug, Clone)]
-struct RemoteServer {
-    id: String,
-    host: String,
-    port: u16,
-    db: String,
-    user: String,
-    password: String,
-    db_type: String,
-}
-
-#[derive(sqlx::FromRow, Debug, Clone)]
-struct ValueString {
-    value: String,
-}
-
-#[derive(sqlx::FromRow, Debug, Clone)]
-struct IdAndModified {
-    id: String,
-    modified: DateTime<Utc>,
-}
-
-#[derive(sqlx::FromRow, Debug, Clone)]
-struct Id {
-    id: String,
-}
 
 const DEFAULT_AUTO_SYNC_TIME: u32 = 5;
-
-// async fn actually_sync_databases<'b, T: Database>(
-async fn actually_sync_databases<'e, 'c: 'e, 'd, 'a, E, DB>(
-    local_conn: &Pool<Sqlite>,
-    // remote_conn: &'b Pool<T>,
-    remote_conn: E,
-) -> Result<bool, String>
-where
-    E: 'e + sqlx::Executor<'c, Database = DB> + Copy,
-    DB: Database,
-    DateTime<Utc>: sqlx::Decode<'d, DB>,
-    String: sqlx::Decode<'d, DB>,
-    String: sqlx::Encode<'a, DB>,
-    DateTime<Utc>: sqlx::Type<DB>,
-    String: sqlx::Type<DB>,
-    <DB as Database>::Arguments<'a>: sqlx::IntoArguments<'a, DB>,
-    IdAndModified: for<'r> sqlx::FromRow<'r, DB::Row>,
-    Id: for<'r> sqlx::FromRow<'r, DB::Row>,
-{
-    let mut has_modified = false;
-
-    // NOTE: Sync Deleted Books /////////////////////////////////
-    let all_local_deletions: Vec<Id> =
-        sqlx::query_as("SELECT id FROM deleted")
-        .fetch_all(local_conn)
-        .await
-        .map_err(|e| e.to_string())?;
-    let all_remote_deletions: Vec<Id> =
-        sqlx::query_as("SELECT id FROM deleted")
-        .fetch_all(remote_conn)
-        .await
-        .map_err(|e| e.to_string())?;
-    let all_local_deletions: HashSet<String> = all_local_deletions
-        .into_iter()
-        .map(|kv| kv.id)
-        .collect();
-    let all_remote_deletions: HashSet<String> = all_remote_deletions
-        .into_iter()
-        .map(|kv| kv.id)
-        .collect();
-    let local_to_delete = all_remote_deletions.difference(&all_local_deletions);
-    let remote_to_delete = all_local_deletions.difference(&all_remote_deletions);
-
-    // NOTE: Remove from local first
-    let mut add_to_delete_table = QueryBuilder::<Sqlite>::new("INSERT INTO deleted (id)");
-    add_to_delete_table.push_values(local_to_delete.clone(), |mut builder, to_delete| {
-        has_modified = true;
-        builder.push_bind(to_delete);
-    });
-    add_to_delete_table.build().execute(local_conn).await.map_err(|e| e.to_string())?;
-
-    let mut remove_from_documents = QueryBuilder::<Sqlite>::new("DELETE FROM documents WHERE id IN (");
-    let mut sep = remove_from_documents.separated(", ");
-    for id in local_to_delete.clone() {
-        has_modified = true;
-        sep.push_bind(id);
-    }
-    sep.push_unseparated(")");
-    remove_from_documents.build().execute(local_conn).await.map_err(|e| e.to_string())?;
-
-    let mut remove_from_books = QueryBuilder::<Sqlite>::new("DELETE FROM books WHERE id IN (");
-    let mut sep = remove_from_books.separated(", ");
-    for id in local_to_delete {
-        has_modified = true;
-        sep.push_bind(id);
-    }
-    sep.push_unseparated(")");
-    remove_from_books.build().execute(local_conn).await.map_err(|e| e.to_string())?;
-    
-    // NOTE: Remove remote second
-    let mut add_to_delete_table = QueryBuilder::<DB>::new("INSERT INTO deleted (id)");
-    add_to_delete_table.push_values(remote_to_delete.clone(), |mut builder, to_delete| {
-        has_modified = true;
-        builder.push_bind(to_delete);
-    });
-    add_to_delete_table.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
-
-    let mut remove_from_documents = QueryBuilder::<DB>::new("DELETE FROM documents WHERE id IN (");
-    let mut sep = remove_from_documents.separated(", ");
-    for id in remote_to_delete.clone() {
-        has_modified = true;
-        sep.push_bind(id);
-    }
-    sep.push_unseparated(")");
-    remove_from_documents.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
-
-    let mut remove_from_books = QueryBuilder::<DB>::new("DELETE FROM books WHERE id IN (");
-    let mut sep = remove_from_books.separated(", ");
-    for id in remote_to_delete {
-        has_modified = true;
-        sep.push_bind(id);
-    }
-    sep.push_unseparated(")");
-    remove_from_books.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
-
-    // NOTE: Sync Existing Books ///////////////////////////////
-    let all_local_books: Vec<IdAndModified> =
-        sqlx::query_as("SELECT id, modified FROM books")
-        .fetch_all(local_conn)
-        .await
-        .map_err(|e| e.to_string())?;
-    let all_remote_books: Vec<IdAndModified> =
-        sqlx::query_as("SELECT id, modified FROM books")
-        .fetch_all(remote_conn)
-        .await
-        .map_err(|e| e.to_string())?;
-    let all_local_books: HashMap<String, DateTime<Utc>> = all_local_books
-        .into_iter()
-        .map(|kv| (kv.id, kv.modified))
-        .collect();
-    let all_remote_books: HashMap<String, DateTime<Utc>> = all_remote_books
-        .into_iter()
-        .map(|kv| (kv.id, kv.modified))
-        .collect();
-    // let on_local_not_remote = 
-
-    Ok(has_modified) // NOTE: return if changes were made
-    // INFO: Get all remote books not in the local database
-    // 
-    // let mut query_builder = QueryBuilder::<MySql>::new("SELECT id, modified FROM books");
-    // if !all_local_books.is_empty() {
-    //     query_builder.push(" WHERE id NOT IN (");
-    //     let mut sep = query_builder.separated(", ");
-    //     for local_book in &all_local_books {
-    //         sep.push_bind(local_book.id.clone());
-    //     }
-    //     sep.push_unseparated(")");
-    // }
-    // let e_remote_books: Result<Vec<IdAndModified>, String> = query_builder
-    //     .build_query_as()
-    //     .fetch_all(&conn)
-    //     .await
-    //     .map_err(|e| e.to_string());
-    // match e_remote_books {
-    //     Err(e) => {errors.push(e);},
-    //     Ok(new_remote_books) if !new_remote_books.is_empty() => {
-    //         ()               
-    //     },
-    //     _ => {},
-    // }
-}
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -541,7 +378,7 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
                         info!("e_conn returned");
                         match e_conn {
                             Ok(conn) => {
-                                let e_caused_changes = actually_sync_databases(&local_conn, &conn).await;
+                                let e_caused_changes = actually_sync_databases_mysql(&local_conn, &conn).await;
                                 match e_caused_changes {
                                     Err(e) => {errors.push(e);},
                                     Ok(caused_changes) => {
@@ -570,13 +407,14 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
                         ).await;
                         match e_conn {
                             Ok(conn) => {
-                                let e_caused_changes = actually_sync_databases(&local_conn, &conn).await;
-                                match e_caused_changes {
-                                    Err(e) => {errors.push(e);},
-                                    Ok(caused_changes) => {
-                                        changes_made = caused_changes || changes_made;
-                                    }
-                                }
+                                // FIXME:
+                                // let e_caused_changes = actually_sync_databases(&local_conn, &conn).await;
+                                // match e_caused_changes {
+                                //     Err(e) => {errors.push(e);},
+                                //     Ok(caused_changes) => {
+                                //         changes_made = caused_changes || changes_made;
+                                //     }
+                                // }
                             },
                             Err(e) => {
                                 errors.push(e);
