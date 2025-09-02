@@ -26,3 +26,13 @@ pub struct IdAndModified {
 pub struct Id {
     pub id: String,
 }
+
+#[derive(sqlx::FromRow, Debug, Clone)]
+pub struct Book {
+    pub id: String,
+    pub modified: DateTime<Utc>,
+    pub name: Option<String>,
+    pub icon: Option<String>,
+    pub icon_color: Option<String>,
+    pub trash: u8,
+}

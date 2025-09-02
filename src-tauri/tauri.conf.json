@@ -26,10 +26,13 @@
         ]
       },
       "csp": {
-        "default-src": "'self' asset:",
-        "connect-src": "ipc: http://ipc.localhost",
+        "default-src": "'self' asset: blob:",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
         "img-src": "'self' asset: tauri: blob: data: https: http:",
-        "style-src": "'self' 'unsafe-inline'"
+        "connect-src": "ipc: http://ipc.localhost",
+        "worker-src": "'self' blob: asset:",
+        "child-src": "'self' blob: asset:"
       }
     }
   },

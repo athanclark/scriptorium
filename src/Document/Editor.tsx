@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect, useDeferredValue, startTransition } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { NativeSelect, Typography, Tabs, Textarea } from "@mantine/core";
 import { IconEdit, IconEye } from "@tabler/icons-react";
@@ -20,6 +20,7 @@ export type Syntax = "md" | "adoc" | "html";
 
 function Editor({ value, setValue, syntax, setSyntax }: EditorProps) {
   const [currentTab, setCurrentTab] = useState<string | null>("view");
+  const deferredValue = useDeferredValue(value);
 
   return (
     <>
@@ -44,15 +45,24 @@ function Editor({ value, setValue, syntax, setSyntax }: EditorProps) {
               {label: "HTML", value: "html"}
             ]}
           />
-          <Edit value={value} setValue={setValue} syntax={syntax} />
+          <Edit
+            value={value}
+            setValue={(v) => {
+              setValue(v);
+              startTransition(() => {});
+            }}
+            syntax={syntax}
+          />
         </Tabs.Panel>
         <Tabs.Panel value="view">
-          { currentTab === "view" && (<View value={value} syntax={syntax} />) }
+          { currentTab === "view" && (<View value={deferredValue} syntax={syntax} />) }
         </Tabs.Panel>
       </Tabs>
     </>
   );
 }
+
+// function EditorTabs({ view, edit }:)
 
 type EditProps = {
   value: string;
@@ -80,16 +90,45 @@ type ViewProps = {
 const asciidoctor = Asciidoctor();
 
 function View({ value, syntax }: ViewProps) {
+  const [html, setHtml] = useState("");
+
+  const worker = useMemo(
+    () =>
+      new Worker(new URL("./markdown.worker.ts", import.meta.url), {
+        type: "module",
+      }),
+    []
+  );
+
+  // FIXME: Fuck web workers, just use invoke
+  useEffect(() => {
+    let active = true;
+    worker.onmessage = (e: MessageEvent<string>) => {
+      if (active) {
+        console.log("received html", e.data);
+        setHtml(e.data);
+      }
+    };
+    console.log("posing", value);
+    worker.postMessage(value); // ideally debounced (150–250 ms)
+    return () => {
+      active = false;
+    };
+  }, [value, worker]);
+
+  console.log("html", html);
+
   const renderedValue = syntax === "md"
-    ? (
-      <ReactMarkdown
-        components={{ img: Img }}
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
-      >
-        {value}
-      </ReactMarkdown>
-    )
+    ? (<div dangerouslySetInnerHTML={{ __html: html }} />)
+    // ? (
+    //   <ReactMarkdown
+    //     components={{ img: Img }}
+    //     remarkPlugins={[remarkGfm]}
+    //     rehypePlugins={[rehypeHighlight]}
+    //   >
+    //     {value}
+    //   </ReactMarkdown>
+    // )
     : syntax === "adoc"
     // @ts-ignore
     ? (<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(asciidoctor.convert(value)) }} />)
