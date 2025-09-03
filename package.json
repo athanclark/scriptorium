@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "rsync -aL --ignore-existing node_modules/mathjax public && vite",
+    "build": "rsync -aL --ignore-existing node_modules/mathjax public && tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri"
   },
@@ -22,6 +22,7 @@
     "asciidoctor": "^3.0.4",
     "dompurify": "^3.2.6",
     "highlight.js": "^11.11.1",
+    "mathjax": "^4.0.0",
     "polished": "^4.3.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

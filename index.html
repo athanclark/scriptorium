@@ -5,6 +5,22 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tauri + React + Typescript</title>
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          displayMath: [['$$', '$$'], ['\\[','\\]']],
+          packages: {'[+]': ['ams', 'newcommand', 'color']}, // explicitly load extensions
+        },
+        // chtml: {
+        //   // if using a no-font bundle, must specify font here
+        //   font: 'mathjax-tex', 
+        //   // otherwise, default newcm will be embedded in bundle
+        // }
+      };
+    </script>
+    <!-- Load the local v4 bundle -->
+    <script src="/mathjax/tex-mml-chtml.js"></script>
   </head>
 
   <body>

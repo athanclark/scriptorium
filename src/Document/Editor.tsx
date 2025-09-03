@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useDeferredValue, startTransition } from "react";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { useState, useMemo, useRef, useEffect, useDeferredValue, startTransition } from "react";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { NativeSelect, Typography, Tabs, Textarea } from "@mantine/core";
 import { IconEdit, IconEye } from "@tabler/icons-react";
 import ReactMarkdown from "react-markdown";
@@ -92,33 +92,20 @@ const asciidoctor = Asciidoctor();
 function View({ value, syntax }: ViewProps) {
   const [html, setHtml] = useState("");
 
-  const worker = useMemo(
-    () =>
-      new Worker(new URL("./markdown.worker.ts", import.meta.url), {
-        type: "module",
-      }),
-    []
-  );
-
-  // FIXME: Fuck web workers, just use invoke
   useEffect(() => {
-    let active = true;
-    worker.onmessage = (e: MessageEvent<string>) => {
-      if (active) {
-        console.log("received html", e.data);
-        setHtml(e.data);
+    async function go() {
+      if (syntax !== "html") {
+        console.log("sending raw", value, syntax);
+
+        const newHtml = await invoke(`render_${syntax}`, { value: value });
+        console.log("received html", newHtml);
+        setHtml(newHtml);
       }
-    };
-    console.log("posing", value);
-    worker.postMessage(value); // ideally debounced (150–250 ms)
-    return () => {
-      active = false;
-    };
-  }, [value, worker]);
+    }
+    go();
+  }, [value]);
 
-  console.log("html", html);
-
-  const renderedValue = syntax === "md"
+  const renderedValue = (syntax === "md" || syntax === "adoc")
     ? (<div dangerouslySetInnerHTML={{ __html: html }} />)
     // ? (
     //   <ReactMarkdown
@@ -129,15 +116,17 @@ function View({ value, syntax }: ViewProps) {
     //     {value}
     //   </ReactMarkdown>
     // )
-    : syntax === "adoc"
-    // @ts-ignore
-    ? (<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(asciidoctor.convert(value)) }} />)
+    // : syntax === "adoc"
+    // // @ts-ignore
+    // ? (<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(asciidoctor.convert(value)) }} />)
     : syntax === "html"
     ? (<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(value) }} />)
     : (<span>Editor Type Not Supported</span>);
   return (
     <Typography>
-      {renderedValue}
+      <MathJaxBlock>
+        {renderedValue}
+      </MathJaxBlock>
     </Typography>
   );
 }
@@ -169,5 +158,15 @@ const Img: React.FC<JSX.IntrinsicElements['img']> = (props) => {
   const { src, ...rest } = props;
   return <img src={toTauriImgSrc(src)} {...rest} />;
 };
+
+function MathJaxBlock({ children }: { children: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    window.MathJax?.typesetPromise([ref.current]).catch(console.error);
+  }, [children]);
+
+  return <div ref={ref}>{children}</div>;
+}
 
 export default Editor;
