@@ -37,6 +37,8 @@ function App() {
   const [colorScheme, setColorScheme] = useState<ColorScheme>("auto");
   const [autoSync, setAutoSync] = useState<boolean>(false);
   const [autoSyncTime, setAutoSyncTime] = useState<number>(5);
+  const [editAndView, setEditAndView] = useState<boolean>(true);
+  const [defaultSyntax, setDefaultSyntax] = useState<Syntax>("md");
   const autoSyncThreadRef = useRef(null);
   const [opened, { toggle }] = useDisclosure();
 
@@ -85,30 +87,34 @@ function App() {
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
-        
-        // color scheme
-        const vs = await db.select<{ value: string }[]>(
-          "SELECT value FROM settings WHERE key = 'color_scheme'",
+        const mapping = new Map();
+        const kvs = await db.select<{ key: string, value: string }[]>(
+          "SELECT key, value FROM settings",
           []
         );
-        if (vs[0]) {
-          setColorScheme(vs[0].value)
+
+        for (const kv of kvs) {
+          mapping.set(kv.key, kv.value);
         }
 
-        // auto sync
-        const newAutoSync = await db.select<{ value: string }[]>(
-          "SELECT value FROM settings WHERE key = 'auto_sync'",
-          []
-        );
-        if (newAutoSync.length > 0 && newAutoSync[0].value === "true") {
-          setAutoSync(true);
+        if (mapping.get("color_scheme")) {
+          setColorScheme(mapping.get("color_scheme"));
         }
-        const newAutoSyncTime = await db.select<{ value: string }[]>(
-          "SELECT value FROM settings WHERE key = 'auto_sync_time'",
-          []
-        );
-        if (newAutoSyncTime.length > 0) {
-          setAutoSyncTime(Number(newAutoSyncTime[0].value));
+
+        if (mapping.get("auto_sync") === "true") {
+          setColorScheme(true);
+        }
+
+        if (mapping.get("auto_sync_time")) {
+          setColorScheme(Number(mapping.get("auto_sync_time")));
+        }
+
+        if (mapping.get("edit_and_view") === "false") {
+          setColorScheme(false);
+        }
+
+        if (mapping.get("default_syntax")) {
+          setColorScheme(mapping.get("default_syntax"));
         }
       } catch(e) {
         console.error("Couldn't select initial values", e);
@@ -139,6 +145,10 @@ function App() {
             setAutoSync={setAutoSync}
             autoSyncTime={autoSyncTime}
             setAutoSyncTime={setAutoSyncTime}
+            editAndView={editAndView}
+            setEditAndView={setEditAndView}
+            defaultSyntax={defaultSyntax}
+            setDefaultSyntax={setDefaultSyntax}
           />
         </AppShell.Header>
 
@@ -162,6 +172,7 @@ function App() {
                   setReloadNav(!reloadNav);
                 }}
                 toBook={(newBook: string) => setSelectedBook(newBook)}
+                editAndView={editAndView}
               />
               : <Info />
           }
@@ -180,9 +191,21 @@ type HeaderProps = {
   setAutoSync: React.Dispatch<React.SetStateAction<boolean>>;
   autoSyncTime: number;
   setAutoSyncTime: React.Dispatch<React.SetStateAction<number>>;
+  editAndView: boolean;
+  setEditAndView: React.Dispatch<React.SetStateAction<boolean>>;
+  defaultSyntax: Syntax;
+  setDefaultSyntax: React.Dispatch<React.SetStateAction<Syntax>>;
 }
 
-function Header({opened, toggle, colorScheme, setColorScheme, autoSync, setAutoSync, autoSyncTime, setAutoSyncTime}: HeaderProps) {
+function Header({
+  opened,
+  toggle,
+  colorScheme, setColorScheme,
+  autoSync, setAutoSync,
+  autoSyncTime, setAutoSyncTime,
+  editAndView, setEditAndView,
+  defaultSyntax, setDefaultSyntax,
+}: HeaderProps) {
   const computedColorScheme = useComputedColorScheme();
   const [openedSettings, { open: openSettings, close: closeSettings }] = useDisclosure();
 
@@ -196,6 +219,10 @@ function Header({opened, toggle, colorScheme, setColorScheme, autoSync, setAutoS
           setAutoSync={setAutoSync}
           autoSyncTime={autoSyncTime}
           setAutoSyncTime={setAutoSyncTime}
+          editAndView={editAndView}
+          setEditAndView={setEditAndView}
+          defaultSyntax={defaultSyntax}
+          setDefaultSyntax={setDefaultSyntax}
         />
       </Modal>
       <Burger

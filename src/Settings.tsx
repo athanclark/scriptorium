@@ -46,9 +46,19 @@ type SettingsProps = {
   setAutoSync: React.Dispatch<React.SetStateAction<boolean>>;
   autoSyncTime: number;
   setAutoSyncTime: React.Dispatch<React.SetStateAction<number>>;
+  editAndView: boolean;
+  setEditAndView: React.Dispatch<React.SetStateAction<boolean>>;
+  defaultSyntax: Syntax;
+  setDefaultSyntax: React.Dispatch<React.SetStateAction<Syntax>>;
 }
 
-function Settings({ colorScheme, setColorScheme, autoSync, setAutoSync, autoSyncTime, setAutoSyncTime }: SettingsProps) {
+function Settings({
+  colorScheme, setColorScheme,
+  autoSync, setAutoSync,
+  autoSyncTime, setAutoSyncTime,
+  editAndView, setEditAndView,
+  defaultSyntax, setDefaultSyntax,
+}: SettingsProps) {
   const [newRemoteServer, setNewRemoteServer] = useState<RemoteServer>(defaultRemoteServer);
   const [remoteServers, setRemoteServers] = useState<(RemoteServer & {id: string, editing: boolean, verified: boolean | string | null})[] | null>(null);
 
@@ -324,6 +334,10 @@ function Settings({ colorScheme, setColorScheme, autoSync, setAutoSync, autoSync
         setAutoSync={setAutoSync}
         autoSyncTime={autoSyncTime}
         setAutoSyncTime={setAutoSyncTime}
+          editAndView={editAndView}
+          setEditAndView={setEditAndView}
+          defaultSyntax={defaultSyntax}
+          setDefaultSyntax={setDefaultSyntax}
       />
     </Stack>
   );
@@ -336,9 +350,19 @@ type ArbitrarySettingsProps = {
   setAutoSync: React.Dispatch<React.SetStateAction<boolean>>;
   autoSyncTime: number;
   setAutoSyncTime: React.Dispatch<React.SetStateAction<number>>;
+  editAndView: boolean;
+  setEditAndView: React.Dispatch<React.SetStateAction<boolean>>;
+  defaultSyntax: Syntax;
+  setDefaultSyntax: React.Dispatch<React.SetStateAction<Syntax>>;
 }
 
-function ArbitrarySettings({ colorScheme, setColorScheme, autoSync, setAutoSync, autoSyncTime, setAutoSyncTime }: ArbitrarySettingsProps) {
+function ArbitrarySettings({
+  colorScheme, setColorScheme,
+  autoSync, setAutoSync,
+  autoSyncTime, setAutoSyncTime,
+  editAndView, setEditAndView,
+  defaultSyntax, setDefaultSyntax,
+}: ArbitrarySettingsProps) {
 
   function changeColorScheme(c: ColorScheme) {
     setColorScheme(c);
@@ -388,6 +412,38 @@ function ArbitrarySettings({ colorScheme, setColorScheme, autoSync, setAutoSync,
     go();
   }
 
+  function changeEditAndView(a: boolean) {
+    setEditAndView(a)
+    async function go() {
+      try {
+        const db = await Database.load(__LOCAL_DB);
+        db.execute(
+          "INSERT INTO settings (key, value) VALUES ('edit_and_view', $1) ON CONFLICT(key) DO UPDATE SET value = $1",
+          [String(a)]
+        );
+      } catch(e) {
+        console.error("Couldn't save edit and view", e);
+      }
+    }
+    go();
+  }
+
+  function changeDefaultSyntax(s: Syntax) {
+    setDefaultSyntax(c);
+    async function go() {
+      try {
+        const db = await Database.load(__LOCAL_DB);
+        await db.execute(
+          "INSERT INTO settings (key, value) VALUES ('default_syntax', $1) ON CONFLICT(key) DO UPDATE SET value = $1",
+          [s]
+        );
+      } catch(e) {
+        console.error("Couldn't save default syntax", e);
+      }
+    }
+    go();
+  }
+
   return (
     <>
       <Switch checked={autoSync} onChange={e => changeAutoSync(e.currentTarget.checked)} label="Automatically Synchronize" />
@@ -403,6 +459,17 @@ function ArbitrarySettings({ colorScheme, setColorScheme, autoSync, setAutoSync,
           {label: "System", value: "auto"},
           {label: "Dark", value: "dark"},
           {label: "Light", value: "light"},
+        ]}
+      />
+      <Switch checked={editAndView} onChange={e => changeEditAndView(e.currentTarget.checked)} label="View and Edit Documents at the Same Time" />
+      <NativeSelect
+        label="Default Syntax"
+        value={defaultSyntax}
+        onChange={e => changeDefaultSyntax(e.currentTarget.selectedOptions[0].value)}
+        data={[
+          {label: "Markdown", value: "md"},
+          {label: "ASCIIDoc", value: "adoc"},
+          {label: "HTML", value: "html"},
         ]}
       />
     </>

@@ -18,9 +18,10 @@ type DocumentProps = {
   onUpdateDocument: () => void;
   onDeleteDocument: () => void;
   toBook: React.Disptach<React.SetStateAction<string | null>>;
+  editAndView: boolean;
 };
 
-function Document({ doc, reload, onUpdateDocument, onDeleteDocument, toBook }: DocumentProps) {
+function Document({ doc, reload, onUpdateDocument, onDeleteDocument, toBook, editAndView }: DocumentProps) {
   const [content, setContent] = useState("");
   const [name, setName] = useState("");
   const [icon, setIcon] = useState<string | null>(null);
@@ -234,6 +235,7 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument, toBook }: D
           setValue={changeDocumentContent}
           syntax={syntax}
           setSyntax={changeSyntax}
+          editAndView={editAndView}
         />
         <div>
           <Divider />

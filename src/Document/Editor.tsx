@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useDeferredValue, startTransition } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { NativeSelect, Typography, Tabs, Textarea } from "@mantine/core";
+import { NativeSelect, Typography, Tabs, Textarea, Grid } from "@mantine/core";
 import { IconEdit, IconEye } from "@tabler/icons-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -14,15 +14,16 @@ type EditorProps = {
   setValue: (newValue: string) => void;
   syntax: Syntax;
   setSyntax: (newSyntax: Syntax) => void;
+  editAndView: boolean;
 };
 
 export type Syntax = "md" | "adoc" | "html";
 
-function Editor({ value, setValue, syntax, setSyntax }: EditorProps) {
+function Editor({ value, setValue, syntax, setSyntax, editAndView }: EditorProps) {
   const [currentTab, setCurrentTab] = useState<string | null>("view");
   const deferredValue = useDeferredValue(value);
 
-  return (
+  const tabbed = (
     <>
       <Tabs value={currentTab} onChange={setCurrentTab}>
         <Tabs.List style={{marginBottom: "2rem"}}>
@@ -60,6 +61,41 @@ function Editor({ value, setValue, syntax, setSyntax }: EditorProps) {
       </Tabs>
     </>
   );
+
+  const sideBySide = (
+    <Grid>
+      <Grid.Col span={{base: 12, lg: 6}}>
+        <NativeSelect
+          label="Document Syntax"
+          value={syntax}
+          onChange={(event) => {
+            const v = event.currentTarget.selectedOptions[0].value;
+            const newSyntax: Syntax = v === "md" ? "md" : v === "adoc" ? "adoc" : v === "html" ? "html" : "md";
+            setSyntax(newSyntax);
+          }}
+          style={{marginBottom: "1rem"}}
+          data={[
+            {label: "Markdown", value: "md"},
+            {label: "ASCIIdoc", value: "adoc"},
+            {label: "HTML", value: "html"}
+          ]}
+        />
+        <Edit
+          value={value}
+          setValue={(v) => {
+            setValue(v);
+            startTransition(() => {});
+          }}
+          syntax={syntax}
+        />
+      </Grid.Col>
+      <Grid.Col span={{base: 12, lg: 6}}>
+        <View value={deferredValue} syntax={syntax} />
+      </Grid.Col>
+    </Grid>
+  );
+
+  return editAndView ? sideBySide : tabbed;
 }
 
 // function EditorTabs({ view, edit }:)
