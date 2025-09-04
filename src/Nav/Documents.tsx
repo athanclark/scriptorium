@@ -22,9 +22,10 @@ type DocumentsProps = {
   onSelectDocument: React.Dispatch<React.SetStateAction<string | null>>;
   goBack: () => void;
   reload: boolean;
+  defaultSyntax: Syntax;
 };
 
-function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
+function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax }: DocumentsProps) {
   const [documents, setDocuments] = useState<Document[] | null>(null);
   const [bookName, setBookName] = useState<string>("");
   const [bookIcon, setBookIcon] = useState<string | null>(null)
@@ -155,7 +156,10 @@ function Documents({ book, onSelectDocument, goBack, reload }: DocumentsProps) {
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
-        const res = await db.select<{ id: string }[]>("INSERT INTO documents (name, content, book) VALUES ('', '', $1) RETURNING id", [book]);
+        const res = await db.select<{ id: string }[]>(
+          "INSERT INTO documents (name, content, book, syntax) VALUES ('', '', $1, $2) RETURNING id",
+          [book, defaultSyntax]
+        );
         onSelectDocument(res[0].id);
         actuallyReload();
       } catch(e) {

@@ -429,7 +429,7 @@ function ArbitrarySettings({
   }
 
   function changeDefaultSyntax(s: Syntax) {
-    setDefaultSyntax(c);
+    setDefaultSyntax(s);
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);

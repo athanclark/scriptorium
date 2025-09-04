@@ -158,6 +158,7 @@ function App() {
           reloadNav={reloadNav}
           selectedBook={selectedBook}
           setSelectedBook={setSelectedBook}
+          defaultSyntax={defaultSyntax}
         />
 
         <AppShell.Main>
@@ -243,9 +244,10 @@ type NavbarWrapperProps = {
   reloadNav: boolean;
   selectedBook: string | null;
   setSelectedBook: React.Dispatch<React.SetStateAction<string | null>>;
+  defaultSyntax: Syntax;
 };
 
-function NavbarWrapper({ setSelectedDoc, onChangeBooks, reloadNav, selectedBook, setSelectedBook }: NavbarWrapperProps) {
+function NavbarWrapper({ setSelectedDoc, onChangeBooks, reloadNav, selectedBook, setSelectedBook, defaultSyntax }: NavbarWrapperProps) {
   const colorScheme = useComputedColorScheme();
   const bg = colorScheme === "dark" ? "--mantine-color-dark-5" : "--mantine-color-indigo-1";
 
@@ -257,6 +259,7 @@ function NavbarWrapper({ setSelectedDoc, onChangeBooks, reloadNav, selectedBook,
         reload={reloadNav}
         selectedBook={selectedBook}
         setSelectedBook={setSelectedBook}
+        defaultSyntax={defaultSyntax}
       />
     </AppShell.Navbar>
   );
