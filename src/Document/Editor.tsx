@@ -2,12 +2,10 @@ import { useState, useMemo, useRef, useEffect, useDeferredValue, startTransition
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { NativeSelect, Typography, Tabs, Textarea, Grid } from "@mantine/core";
 import { IconEdit, IconEye } from "@tabler/icons-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeHighlight from "rehype-highlight";
 import DOMPurify from "dompurify";
-import Asciidoctor from "asciidoctor";
-import "highlight.js/styles/github.css";
+import CodeEditor from "@uiw/react-textarea-code-editor";
+// import "highlight.js/styles/github.css";
+import "./Editor.css";
 
 type EditorProps = {
   value: string;
@@ -106,14 +104,17 @@ type EditProps = {
   syntax: Syntax;
 };
 
-function Edit({ value, setValue }: EditProps) {
+function Edit({ value, setValue, syntax }: EditProps) {
   return (
-    <Textarea
-      autosize
-      minRows={2}
-      label="Document Code"
+    <CodeEditor
       value={value}
       onChange={(event) => setValue(event.currentTarget.value)}
+      language={syntax}
+      style={{
+        backgroundColor: "rgba(0,0,0,0)",
+        color: "var(--mantine-color-text)",
+        borderRadius: "var(--mantine-radius-default)",
+      }}
     />
   );
 }
@@ -122,8 +123,6 @@ type ViewProps = {
   value: string;
   syntax: Syntax;
 };
-
-const asciidoctor = Asciidoctor();
 
 function View({ value, syntax }: ViewProps) {
   const [html, setHtml] = useState("");

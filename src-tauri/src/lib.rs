@@ -5,7 +5,10 @@ use crate::mysql::actually_sync_databases_mysql;
 mod migrations;
 use crate::migrations::{SQLITE_MIGRATIONS, MYSQL_PG_MIGRATIONS};
 
-use tauri::State;
+use tauri::{
+    State,
+    // menu::{Menu, Submenu, MenuItem}
+};
 use tauri_plugin_sql::{Migration, MigrationKind, MigrationList, DbInstances, DbPool};
 use chrono::{DateTime, Utc};
 use log::{warn, info, debug};
@@ -290,6 +293,19 @@ pub fn run() {
 
     tauri::Builder::default()
         // .plugin(tauri_plugin_sql::Builder::new().build())
+        // .menu(|handle|
+        //     Menu::with_items(handle, &[
+        //         Submenu::with_items(handle, "Edit", true, &[ //?
+        //             PredefinedMenuItem.
+        //             .add_native_item(MenuItem::Undo)
+        //             .add_native_item(MenuItem::Redo)
+        //             .add_native_item(MenuItem::Separator)
+        //             .add_native_item(MenuItem::Cut)
+        //             .add_native_item(MenuItem::Copy)
+        //             .add_native_item(MenuItem::Paste)
+        //             .add_native_item(MenuItem::SelectAll),
+        //     )),
+        // )
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:scriptorium.db", SQLITE_MIGRATIONS.0.clone())

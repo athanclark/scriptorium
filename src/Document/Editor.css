@@ -1,0 +1,31 @@
+.w-tc-editor {
+  --input-height-sm: calc(2.25rem * var(--mantine-scale));
+  --input-height: var(--input-height-sm);
+  --input-radius: var(--mantine-radius-default);
+  --input-cursor: text;
+  --input-text-align: left;
+  --input-line-height: calc(var(--input-height) - calc(0.125rem * var(--mantine-scale)));
+  --input-padding: calc(var(--input-height) / 3);
+  --input-padding-inline-start: var(--input-padding);
+  --input-padding-inline-end: var(--input-padding);
+  --input-color: var(--mantine-color-text);
+  /* --input-right-section-size: var( */
+  /* --input-right-section-width, */
+  /* calc(var(--input-height) - calc(0.125rem * var(--mantine-scale))) */
+  /* ); */
+  --input-size: var(--input-height);
+  border: calc(0.0625rem * var(--mantine-scale)) solid var(--input-bd);
+  font-family: var(--input-font-family, var(--mantine-font-family));
+  font-size: var(--input-fz, var(--input-fz, var(--mantine-font-size-sm)));
+}
+
+.w-tc-editor:focus {
+  outline: none;
+  --input-bd: var(--input-bd-focus) !important;
+}
+
+[data-mantine-color-scheme='dark'] .w-tc-editor {
+  --input-bd: var(--mantine-color-dark-4);
+  --input-bg: var(--mantine-color-dark-6);
+  --input-bd-focus: var(--mantine-primary-color-filled);
+}

@@ -102,19 +102,19 @@ function App() {
         }
 
         if (mapping.get("auto_sync") === "true") {
-          setColorScheme(true);
+          setAutoSync(true);
         }
 
         if (mapping.get("auto_sync_time")) {
-          setColorScheme(Number(mapping.get("auto_sync_time")));
+          setAutoSyncTime(Number(mapping.get("auto_sync_time")));
         }
 
         if (mapping.get("edit_and_view") === "false") {
-          setColorScheme(false);
+          setEditAndView(false);
         }
 
         if (mapping.get("default_syntax")) {
-          setColorScheme(mapping.get("default_syntax"));
+          setDefaultSyntax(mapping.get("default_syntax"));
         }
       } catch(e) {
         console.error("Couldn't select initial values", e);
