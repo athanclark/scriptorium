@@ -63,7 +63,10 @@ fn render_adoc(value: &str) -> Result<String, String> {
     path.push(r".");
     let mut parser = adoc::parser::Parser::new(path);
     let asg = parser.parse(scanner).map_err(|e| e.to_string())?;
-    adoc::backends::htmls::render_htmlbook(&asg).map_err(|e| e.to_string())
+    info!("completed parsing");
+    let res = adoc::backends::htmls::render_htmlbook(&asg).map_err(|e| e.to_string());
+    info!("completed rendering");
+    res
 }
 
 const DEFAULT_AUTO_SYNC_TIME: u32 = 5;

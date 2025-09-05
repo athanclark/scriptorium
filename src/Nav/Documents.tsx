@@ -23,9 +23,10 @@ type DocumentsProps = {
   goBack: () => void;
   reload: boolean;
   defaultSyntax: Syntax;
+  selectedDoc: string | null;
 };
 
-function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax }: DocumentsProps) {
+function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax, selectedDoc }: DocumentsProps) {
   const [documents, setDocuments] = useState<Document[] | null>(null);
   const [bookName, setBookName] = useState<string>("");
   const [bookIcon, setBookIcon] = useState<string | null>(null)
@@ -65,6 +66,7 @@ function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax }: Do
       return (<NavLink
         key={d.id}
         href="#"
+        active={selectedDoc && d.id === selectedDoc}
         label={d.name === "" ? (<em>No Document Name</em>) : d.name}
         leftSection={icon}
         onClick={() => onSelectDocument(d.id)}

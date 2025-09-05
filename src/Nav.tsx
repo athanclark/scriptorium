@@ -12,9 +12,10 @@ type NavProps = {
   selectedBook: string | null;
   setSelectedBook: React.Dispatch<React.SetStateAction<string | null>>;
   defaultSyntax: Syntax;
+  selectedDoc: string | null;
 };
 
-function Nav({ onSelectDocument, onChangeBooks, reload, selectedBook, setSelectedBook, defaultSyntax }: NavProps) {
+function Nav({ onSelectDocument, onChangeBooks, reload, selectedBook, setSelectedBook, defaultSyntax, selectedDoc }: NavProps) {
   // immediate change - used for navigation
   const [bookIsSelected, setBookIsSelected] = useState<boolean>(false);
   const [reloadBooks, setReloadBooks] = useState(false);
@@ -53,6 +54,7 @@ function Nav({ onSelectDocument, onChangeBooks, reload, selectedBook, setSelecte
               setReloadBooks(!reloadBooks);
             }}
             defaultSyntax={defaultSyntax}
+            selectedDoc={selectedDoc}
           />
         </div>}
       </Transition>

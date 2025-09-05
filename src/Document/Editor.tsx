@@ -1,10 +1,16 @@
 import { useState, useMemo, useRef, useEffect, useDeferredValue, startTransition } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { NativeSelect, Typography, Tabs, Textarea, Grid } from "@mantine/core";
+import { useColorScheme } from "@mantine/hooks";
 import { IconEdit, IconEye } from "@tabler/icons-react";
 import DOMPurify from "dompurify";
-import CodeEditor from "@uiw/react-textarea-code-editor";
-// import "highlight.js/styles/github.css";
+import CodeMirror from "@uiw/react-codemirror";
+import { markdown, markdownLanguage, markdownKeymap } from "@codemirror/lang-markdown";
+import { languages } from "@codemirror/language-data";
+import { StreamLanguage } from '@codemirror/language';
+import { asciidoc as asciidocMode } from 'codemirror-asciidoc';
+import { html } from "@codemirror/lang-html";
+import { basicSetup } from "codemirror"
 import "./Editor.css";
 
 type EditorProps = {
@@ -105,18 +111,40 @@ type EditProps = {
 };
 
 function Edit({ value, setValue, syntax }: EditProps) {
+  const colorScheme = useColorScheme();
+  const extensions = useMemo(() => [basicSetup], []);
+  const completeExtensions = useMemo(() => {
+    if (syntax === "md") {
+      return [
+        ...extensions,
+        markdown({ base: markdownLanguage, codeLanguages: languages }),
+      ];
+    } else if (syntax === "adoc") {
+      return [
+        ...extensions,
+        StreamLanguage.define(asciidocMode),
+      ];
+    } else {
+      return [
+        ...extensions,
+        html({ autoCloseTags: true }),
+      ];
+    }
+  }, [syntax]);
+
   return (
-    <CodeEditor
+    <CodeMirror
+      theme={colorScheme}
       value={value}
-      onChange={(event) => setValue(event.currentTarget.value)}
-      language={syntax}
-      style={{
-        backgroundColor: "rgba(0,0,0,0)",
-        color: "var(--mantine-color-text)",
-        borderRadius: "var(--mantine-radius-default)",
-      }}
+      onChange={setValue}
+      extensions={completeExtensions}
     />
   );
+      // style={{
+      //   backgroundColor: "rgba(0,0,0,0)",
+      //   color: "var(--mantine-color-text)",
+      //   borderRadius: "var(--mantine-radius-default)",
+      // }}
 }
 
 type ViewProps = {
@@ -129,12 +157,16 @@ function View({ value, syntax }: ViewProps) {
 
   useEffect(() => {
     async function go() {
-      if (syntax !== "html") {
-        console.log("sending raw", value, syntax);
+      try {
+        if (syntax !== "html") {
+          console.log("sending raw", value, syntax);
 
-        const newHtml = await invoke(`render_${syntax}`, { value: value });
-        console.log("received html", newHtml);
-        setHtml(newHtml);
+          const newHtml = await invoke(`render_${syntax}`, { value: value });
+          console.log("received html", newHtml);
+          setHtml(newHtml);
+        }
+      } catch(e) {
+        console.warn("failed to render", e);
       }
     }
     go();
@@ -142,18 +174,6 @@ function View({ value, syntax }: ViewProps) {
 
   const renderedValue = (syntax === "md" || syntax === "adoc")
     ? (<div dangerouslySetInnerHTML={{ __html: html }} />)
-    // ? (
-    //   <ReactMarkdown
-    //     components={{ img: Img }}
-    //     remarkPlugins={[remarkGfm]}
-    //     rehypePlugins={[rehypeHighlight]}
-    //   >
-    //     {value}
-    //   </ReactMarkdown>
-    // )
-    // : syntax === "adoc"
-    // // @ts-ignore
-    // ? (<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(asciidoctor.convert(value)) }} />)
     : syntax === "html"
     ? (<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(value) }} />)
     : (<span>Editor Type Not Supported</span>);
