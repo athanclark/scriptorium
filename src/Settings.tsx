@@ -51,6 +51,7 @@ type SettingsProps = {
   defaultSyntax: Syntax;
   setDefaultSyntax: React.Dispatch<React.SetStateAction<Syntax>>;
   synchronize: () => void;
+  allowToClose: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 // FIXME: Somehow prevent settings window from being closed until migrations are complete
@@ -63,9 +64,36 @@ function Settings({
   editAndView, setEditAndView,
   defaultSyntax, setDefaultSyntax,
   synchronize,
+  allowToClose,
 }: SettingsProps) {
   const [newRemoteServer, setNewRemoteServer] = useState<RemoteServer>(defaultRemoteServer);
   const [remoteServers, setRemoteServers] = useState<(RemoteServer & {id: string, editing: boolean, verified: boolean | string | null})[] | null>(null);
+  const [migrating, setMigrating] = useState<number>(0);
+
+  useEffect(() => {
+    if (migrating > 0) {
+      allowToClose(false);
+    } else {
+      allowToClose(true);
+    }
+  }, [migrating]);
+
+  function verifyServer(s: RemoveServer & {id: string, editing: boolean, verified: boolean | string | null}) {
+    async function go() {
+      setRemoteServers(ss => ss.map(s_ => s_.id === s.id ? { ...s_, verified: null } : s_));
+      let verified;
+      try {
+        setMigrating(n => n+1);
+        verified = await invoke("check_database", { dbId: s.id });
+        setMigrating(n => n-1);
+      } catch(e) {
+        verified = e;
+        setMigrating(n => n-1);
+      }
+      setRemoteServers(ss => ss.map(s_ => s_.id === s.id ? { ...s_, verified: verified } : s_));
+    }
+    go();
+  }
 
   function actuallyReload() {
     async function go() {
@@ -78,14 +106,7 @@ function Settings({
         setRemoteServers(ss.map(s => ({ ...s, editing: false, verified: null })));
 
         for (const s of ss) {
-          let verified;
-          try {
-            verified = await invoke("check_database", { dbId: s.id });
-          } catch(e) {
-            verified = e;
-          }
-          console.log("verified", verified);
-          setRemoteServers(ss.map(s_ => s_.id === s.id ? { ...s_, verified: verified } : s_));
+          verifyServer(s)
         }
       } catch(e) {
         console.error("Fetching remote servers Failed", e);
@@ -118,7 +139,7 @@ function Settings({
   }
 
   function editRemoteServer(newS: RemoteServer & { id: string, editing: boolean, verified: boolean | string | null }) {
-    setRemoteServers(remoteServers.map(s => s.id === newS.id ? { ...s, ...newS } : { ...s, editing: false }));
+    setRemoteServers(ss => ss.map(s => s.id === newS.id ? { ...s, ...newS } : { ...s, editing: false }));
   }
 
   function viewRemoteServer(s: RemoteServer & { id: string, editing: boolean, verified: boolean | string | null }) {
@@ -216,7 +237,6 @@ function Settings({
         </Table.Tr>
       );
     } else {
-      console.log(s.verified);
       return (
         <Table.Tr key={s.id}>
           <Table.Td span={2}>
@@ -243,9 +263,11 @@ function Settings({
           <Table.Td>
             {
               typeof s.verified === "string"
-                ? (<Alert color="red" title="Verification Issue">{s.verified}</Alert>)
-                : s.verified === false
-                ? (<Alert color="red" title="Verification Issue"></Alert>)
+                ? (<Stack><Alert color="red" title="Verification Issue">{s.verified}</Alert><Button onClick={() => verifyServer(s)}>Verify Now</Button></Stack>)
+                : s.verified === true
+                ? (<Button fullWidth onClick={() => verifyServer(s)}>Re-Verify Now</Button>)
+                : s.verified === null
+                ? (<Button disabled loading fullWidth />)
                 : null
             }
           </Table.Td>

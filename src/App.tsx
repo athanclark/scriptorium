@@ -227,10 +227,11 @@ function Header({
 }: HeaderProps) {
   const computedColorScheme = useComputedColorScheme();
   const [openedSettings, { open: openSettings, close: closeSettings }] = useDisclosure();
+  const [allowedToClose, setAllowedToClose] = useState<boolean>(true);
 
   return (
     <div style={{display: "flex", justifyContent: "space-between"}}>
-      <Modal opened={openedSettings} onClose={closeSettings} title="Settings" size="100%">
+      <Modal opened={openedSettings} onClose={() => {allowedToClose && closeSettings();}} title="Settings" size="100%">
         <Settings
           colorScheme={colorScheme}
           setColorScheme={setColorScheme}
@@ -243,6 +244,7 @@ function Header({
           defaultSyntax={defaultSyntax}
           setDefaultSyntax={setDefaultSyntax}
           synchronize={synchronize}
+          allowToClose={setAllowedToClose}
         />
       </Modal>
       <Burger
