@@ -36,3 +36,15 @@ pub struct Book {
     pub icon_color: Option<String>,
     pub trash: u8,
 }
+
+#[derive(sqlx::FromRow, Debug, Clone)]
+pub struct Document {
+    pub id: String,
+    pub book: String,
+    pub modified: DateTime<Utc>,
+    pub name: Option<String>,
+    pub content: Option<String>,
+    pub syntax: String,
+    pub icon: Option<String>,
+    pub icon_color: Option<String>,
+}

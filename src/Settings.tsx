@@ -52,6 +52,9 @@ type SettingsProps = {
   setDefaultSyntax: React.Dispatch<React.SetStateAction<Syntax>>;
 }
 
+// FIXME: Somehow prevent settings window from being closed until migrations are complete
+// TODO: Give notification when synchronization is happening
+
 function Settings({
   colorScheme, setColorScheme,
   autoSync, setAutoSync,
@@ -162,7 +165,7 @@ function Settings({
                   editRemoteServer({ ...s, dbType: v });
                 }
               }}
-              data={[{label: "MySQL", value: "mysql"}, {label: "PostgreSQL", value: "mysql"}]}
+              data={[{label: "MySQL", value: "mysql"}, {label: "PostgreSQL", value: "postgresql"}]}
             />
           </Table.Td>
           <Table.Td span={2}>
@@ -176,7 +179,7 @@ function Settings({
             <NumberInput
               label="Port"
               value={s.port}
-              onChange={e => editRemoteServer({ ...s, port: Number(e.currentTarget.value) })}
+              onChange={e => editRemoteServer({ ...s, port: e })}
             />
           </Table.Td>
           <Table.Td span={2}>
@@ -263,7 +266,7 @@ function Settings({
                 setNewRemoteServer({ ...newRemoteServer, dbType: v });
               }
             }}
-            data={[{label: "MySQL", value: "mysql"}, {label: "PostgreSQL", value: "mysql"}]}
+            data={[{label: "MySQL", value: "mysql"}, {label: "PostgreSQL", value: "postgresql"}]}
           />
         </Grid.Col>
         <Grid.Col span={2}>
@@ -277,7 +280,7 @@ function Settings({
           <NumberInput
             label="Port"
             value={newRemoteServer.port}
-            onChange={e => setNewRemoteServer({ ...newRemoteServer, port: Number(e.currentTarget.value) })}
+            onChange={e => setNewRemoteServer({ ...newRemoteServer, port: e })}
           />
         </Grid.Col>
         <Grid.Col span={2}>

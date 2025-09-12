@@ -1,4 +1,4 @@
-use crate::types::{IdAndModified, Id, Book};
+use crate::types::{IdAndModified, Id, Book, Document};
 use sqlx::{
     Connection, 
     ConnectOptions,
@@ -151,7 +151,7 @@ pub async fn actually_sync_databases_mysql(
             }
         }
         if !upsert_to_local.is_empty() {
-            // TODO: query all relevant fields for each book in `add_to_local` and `update_local`
+            // TODO: query all fields from remote books that are slated to be upserted in local db
             let mut query_builder = sqlx::QueryBuilder::new(
                 "SELECT id, name, modofied, icon, icon_color, trash FROM books WHERE id IN ("
             );
@@ -159,7 +159,6 @@ pub async fn actually_sync_databases_mysql(
             for id in upsert_to_local.into_iter() {
                 sep.push_bind(id);
             }
-            sep.push_unseparated(")");
 
             let books: Vec<Book> = query_builder
                 .build_query_as()
@@ -170,50 +169,172 @@ pub async fn actually_sync_databases_mysql(
             let mut query_builder = sqlx::QueryBuilder::new(
                 "INSERT INTO books (id, name, modified, icon, icon_color, trash) "
             );
-            query_builder.push_values(books, |mut book, row| {
-                book.push_bind(row.id)
+            query_builder.push_values(books, |mut sep, row| {
+                sep.push_bind(row.id)
                     .push_bind(row.name)
                     .push_bind(row.modified)
                     .push_bind(row.icon)
                     .push_bind(row.icon_color)
                     .push_bind(row.trash);
+                has_modified = true;
             });
+            query_builder.push(") ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, modified = EXCLUDED.modified, icon = EXCLUDED.icon, icon_color = EXCLUDED.icon_color, trash = EXCLUDED.trash");
 
             query_builder.build().execute(local_conn).await.map_err(|e| e.to_string())?;
-            // TODO: upsert all those books into the local db
         }
-        {
-            // TODO: query all relevant fields for each book in `add_to_remote` and `update_remote`
-            // let books_to_add_to_remote = sqlx::query_as("SELECT id, ")
-            // TODO: upsert all those books into the remote db
+        if !upsert_to_remote.is_empty() {
+            // TODO: query all fields from local books that are slated to be upserted in remote db
+            let mut query_builder = sqlx::QueryBuilder::new(
+                "SELECT id, name, modofied, icon, icon_color, trash FROM books WHERE id IN ("
+            );
+            let mut sep = query_builder.separated(", ");
+            for id in upsert_to_remote.into_iter() {
+                sep.push_bind(id);
+            }
+
+            let books: Vec<Book> = query_builder
+                .build_query_as()
+                .fetch_all(local_conn)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            let mut query_builder = sqlx::QueryBuilder::new(
+                "INSERT INTO books (id, name, modified, icon, icon_color, trash) "
+            );
+            query_builder.push_values(books, |mut sep, row| {
+                sep.push_bind(row.id)
+                    .push_bind(row.name)
+                    .push_bind(row.modified)
+                    .push_bind(row.icon)
+                    .push_bind(row.icon_color)
+                    .push_bind(row.trash);
+                has_modified = true;
+            });
+            // FIXME: PostgreSQL and SQLite will use `EXCLUDED` instead of `new`
+            // FIXME: MariaDB uses `Values(name, modified, ...)` deprecated syntax -- will have to
+            // support explicitly
+            query_builder.push(") ON CONFLICT (id) DO UPDATE SET name = new.name, modified = new.modified, icon = new.icon, icon_color = new.icon_color, trash = new.trash");
+
+            query_builder.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
         }
-        // let add_to_local = all_remote_books.difference(&all_local_books);
-        // let add_to_remote = all_local_books.difference(&all_remote_books);
-        
+    }
+
+    {
+        // NOTE: Sync Existing Documents ///////////////////////////////
+        let all_local_documents: Vec<IdAndModified> =
+            sqlx::query_as("SELECT id, modified FROM documents")
+            .fetch_all(local_conn)
+            .await
+            .map_err(|e| e.to_string())?;
+        let all_remote_documents: Vec<IdAndModified> =
+            sqlx::query_as("SELECT id, modified FROM documents")
+            .fetch_all(remote_conn)
+            .await
+            .map_err(|e| e.to_string())?;
+        let all_local_documents: HashMap<String, DateTime<Utc>> = all_local_documents
+            .into_iter()
+            .map(|kv| (kv.id, kv.modified))
+            .collect();
+        let all_remote_documents: HashMap<String, DateTime<Utc>> = all_remote_documents
+            .into_iter()
+            .map(|kv| (kv.id, kv.modified))
+            .collect();
+        let mut upsert_to_local: HashSet<String> = HashSet::new();
+        for (remote_id, remote_modified) in &all_remote_documents {
+            match all_local_documents.get(remote_id) {
+                None => {
+                    upsert_to_local.insert(remote_id.clone());
+                },
+                Some(local_modified) if remote_modified > local_modified => {
+                    upsert_to_local.insert(remote_id.clone());
+                },
+                _ => {},
+            }
+        }
+        let mut upsert_to_remote: HashSet<String> = HashSet::new();
+        for (local_id, local_modified) in all_local_documents.into_iter() {
+            match all_remote_documents.get(&local_id) {
+                None => {
+                    upsert_to_remote.insert(local_id);
+                },
+                Some(remote_modified) if local_modified > *remote_modified => {
+                    upsert_to_remote.insert(local_id);
+                },
+                _ => {},
+            }
+        }
+        if !upsert_to_local.is_empty() {
+            // TODO: query all fields from remote documents that are slated to be upserted in local db
+            let mut query_builder = sqlx::QueryBuilder::new(
+                "SELECT id, book, name, modofied, content, syntax, icon, icon_color FROM documents WHERE id IN ("
+            );
+            let mut sep = query_builder.separated(", ");
+            for id in upsert_to_local.into_iter() {
+                sep.push_bind(id);
+            }
+
+            let documents: Vec<Document> = query_builder
+                .build_query_as()
+                .fetch_all(remote_conn)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            let mut query_builder = sqlx::QueryBuilder::new(
+                "INSERT INTO documents (id, book, name, modified, content, syntax, icon, icon_color) "
+            );
+            query_builder.push_values(documents, |mut sep, row| {
+                sep.push_bind(row.id)
+                    .push_bind(row.book)
+                    .push_bind(row.name)
+                    .push_bind(row.modified)
+                    .push_bind(row.content)
+                    .push_bind(row.syntax)
+                    .push_bind(row.icon)
+                    .push_bind(row.icon_color);
+                has_modified = true;
+            });
+            query_builder.push(") ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, book = EXCLUDED.book, modified = EXCLUDED.modified, content = EXCLUDED.content, syntax = EXCLUDED.syntax, icon = EXCLUDED.icon, icon_color = EXCLUDED.icon_color");
+
+            query_builder.build().execute(local_conn).await.map_err(|e| e.to_string())?;
+        }
+        if !upsert_to_remote.is_empty() {
+            // TODO: query all fields from local documents that are slated to be upserted in remote db
+            let mut query_builder = sqlx::QueryBuilder::new(
+                "SELECT id, book, name, modofied, content, syntax, icon, icon_color FROM documents WHERE id IN ("
+            );
+            let mut sep = query_builder.separated(", ");
+            for id in upsert_to_remote.into_iter() {
+                sep.push_bind(id);
+            }
+
+            let documents: Vec<Document> = query_builder
+                .build_query_as()
+                .fetch_all(local_conn)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            let mut query_builder = sqlx::QueryBuilder::new(
+                "INSERT INTO documents (id, book, name, modified, content, syntax, icon, icon_color) "
+            );
+            query_builder.push_values(documents, |mut sep, row| {
+                sep.push_bind(row.id)
+                    .push_bind(row.book)
+                    .push_bind(row.name)
+                    .push_bind(row.modified)
+                    .push_bind(row.content)
+                    .push_bind(row.syntax)
+                    .push_bind(row.icon)
+                    .push_bind(row.icon_color);
+                has_modified = true;
+            });
+            // FIXME: PostgreSQL and SQLite will use `EXCLUDED` instead of `new`
+            // FIXME: MariaDB uses `Values(name, modified, ...)` deprecated syntax -- will have to
+            // support explicitly
+            query_builder.push(") ON CONFLICT (id) DO UPDATE SET name = new.name, book = new.book, modified = new.modified, content = new.content, syntax = new.syntax, icon = new.icon, icon_color = new.icon_color");
+
+            query_builder.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
+        }
     }
 
     Ok(has_modified) // NOTE: return if changes were made
-    // INFO: Get all remote books not in the local database
-    // 
-    // let mut query_builder = QueryBuilder::<MySql>::new("SELECT id, modified FROM books");
-    // if !all_local_books.is_empty() {
-    //     query_builder.push(" WHERE id NOT IN (");
-    //     let mut sep = query_builder.separated(", ");
-    //     for local_book in &all_local_books {
-    //         sep.push_bind(local_book.id.clone());
-    //     }
-    //     sep.push_unseparated(")");
-    // }
-    // let e_remote_books: Result<Vec<IdAndModified>, String> = query_builder
-    //     .build_query_as()
-    //     .fetch_all(&conn)
-    //     .await
-    //     .map_err(|e| e.to_string());
-    // match e_remote_books {
-    //     Err(e) => {errors.push(e);},
-    //     Ok(new_remote_books) if !new_remote_books.is_empty() => {
-    //         ()               
-    //     },
-    //     _ => {},
-    // }
 }

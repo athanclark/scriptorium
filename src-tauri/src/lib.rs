@@ -25,8 +25,8 @@ use sqlx::{
     Postgres,
     Sqlite,
     pool::PoolOptions,
-    postgres::{PgConnectOptions, PgPool},
-    mysql::{MySqlConnectOptions, MySqlPool},
+    postgres::{PgConnectOptions, PgPool, PgSslMode},
+    mysql::{MySqlConnectOptions, MySqlPool, MySqlSslMode},
     migrate::{Migrate, Migrator},
 };
 use std::{
@@ -96,30 +96,7 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
                 .await
                 .map_err(|e| vec![e.to_string()])?;
             let mut changes_made = false;
-
             let mut errors: Vec<String> = vec![];
-            // let pack_error = async |f, def| {
-            //     let res = f().await;
-            //     match res {
-            //         Err(e) => {
-            //             errors.push(e);
-            //             def
-            //         }
-            //         Ok(x) => x,
-            //     }
-            // };
-            // let pack_and_run_error = async |f, g, def| {
-            //     let res = f().await;
-            //     match res {
-            //         Err(e) => {
-            //             errors.push(e);
-            //             g().await;
-            //             def
-            //         }
-            //         Ok(x) => x,
-            //     }
-            // };
-
             let mut idx = 0;
 
             loop {
@@ -148,7 +125,8 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
                             .username(&saved_db.user)
                             .password(&saved_db.password)
                             .port(saved_db.port)
-                            .database(&saved_db.db);
+                            .database(&saved_db.db)
+                            .ssl_mode(MySqlSslMode::Required);
                         let e_conn: Result<MySqlPool, String> = run_migrations_and_get_pool(
                             conn_options,
                             MYSQL_PG_MIGRATIONS.clone(),
@@ -178,7 +156,8 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
                             .username(&saved_db.user)
                             .password(&saved_db.password)
                             .port(saved_db.port)
-                            .database(&saved_db.db);
+                            .database(&saved_db.db)
+                            .ssl_mode(PgSslMode::VerifyFull);
                         let e_conn: Result<PgPool, String> = run_migrations_and_get_pool(
                             conn_options,
                             MYSQL_PG_MIGRATIONS.clone(),
@@ -253,7 +232,8 @@ async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Re
                         .username(&saved_db.user)
                         .password(&saved_db.password)
                         .port(saved_db.port)
-                        .database(&saved_db.db);
+                        .database(&saved_db.db)
+                        .ssl_mode(MySqlSslMode::Required);
                     let conn: MySqlPool = run_migrations_and_get_pool(
                         conn_options,
                         MYSQL_PG_MIGRATIONS.clone(),
@@ -270,7 +250,8 @@ async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Re
                         .username(&saved_db.user)
                         .password(&saved_db.password)
                         .port(saved_db.port)
-                        .database(&saved_db.db);
+                        .database(&saved_db.db)
+                        .ssl_mode(PgSslMode::VerifyFull);
                     let conn: PgPool = run_migrations_and_get_pool(
                         conn_options,
                         MYSQL_PG_MIGRATIONS.clone(),
@@ -295,20 +276,6 @@ pub fn run() {
     env_logger::init();
 
     tauri::Builder::default()
-        // .plugin(tauri_plugin_sql::Builder::new().build())
-        // .menu(|handle|
-        //     Menu::with_items(handle, &[
-        //         Submenu::with_items(handle, "Edit", true, &[ //?
-        //             PredefinedMenuItem.
-        //             .add_native_item(MenuItem::Undo)
-        //             .add_native_item(MenuItem::Redo)
-        //             .add_native_item(MenuItem::Separator)
-        //             .add_native_item(MenuItem::Cut)
-        //             .add_native_item(MenuItem::Copy)
-        //             .add_native_item(MenuItem::Paste)
-        //             .add_native_item(MenuItem::SelectAll),
-        //     )),
-        // )
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:scriptorium.db", SQLITE_MIGRATIONS.0.clone())
