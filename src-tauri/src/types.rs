@@ -34,7 +34,7 @@ pub struct Book {
     pub name: Option<String>,
     pub icon: Option<String>,
     pub icon_color: Option<String>,
-    pub trash: u8,
+    pub trash: i32,
 }
 
 #[derive(sqlx::FromRow, Debug, Clone)]

@@ -36,7 +36,7 @@ function App() {
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [colorScheme, setColorScheme] = useState<ColorScheme>("auto");
   const [autoSync, setAutoSync] = useState<boolean>(false);
-  const [autoSyncTime, setAutoSyncTime] = useState<number>(5);
+  const [autoSyncTime, setAutoSyncTime] = useState<number>(60);
   const [editAndView, setEditAndView] = useState<boolean>(true);
   const [defaultSyntax, setDefaultSyntax] = useState<Syntax>("md");
   const autoSyncThreadRef = useRef(null);
@@ -46,15 +46,29 @@ function App() {
   // FIXME: I need to set the timeout manually on each invocation
 
   function attemptSync() {
-    console.log("stubbed attempt sync - will likely do an `invoke`");
     async function go() {
       try {
+        notifications.show({
+          id: "sync",
+          title: "Synchronizing with database",
+          message: "...",
+          color: "blue",
+          autoClose: false,
+        });
         await invoke("sync_databases");
+        notifications.update({
+          id: "sync",
+          title: "Synchronizing with database",
+          message: "Success",
+          color: "green",
+          autoClose: true,
+        });
       } catch(e) {
         console.warn("sync_databases failed", e);
-        notifications.show({
-          title: "Auto Synchronization of Databases Failed",
-          message: e.join("\n") + "\n Auto synchronization turned off.",
+        notifications.update({
+          id: "sync",
+          title: "Synchronizing with database",
+          message: e.join("\n") + ".\n\n Auto synchronization turned off.",
           color: "red",
           autoClose: false,
         })
@@ -149,6 +163,7 @@ function App() {
             setEditAndView={setEditAndView}
             defaultSyntax={defaultSyntax}
             setDefaultSyntax={setDefaultSyntax}
+            synchronize={attemptSync}
           />
         </AppShell.Header>
 
@@ -197,6 +212,7 @@ type HeaderProps = {
   setEditAndView: React.Dispatch<React.SetStateAction<boolean>>;
   defaultSyntax: Syntax;
   setDefaultSyntax: React.Dispatch<React.SetStateAction<Syntax>>;
+  synchronize: () => void;
 }
 
 function Header({
@@ -207,6 +223,7 @@ function Header({
   autoSyncTime, setAutoSyncTime,
   editAndView, setEditAndView,
   defaultSyntax, setDefaultSyntax,
+  synchronize,
 }: HeaderProps) {
   const computedColorScheme = useComputedColorScheme();
   const [openedSettings, { open: openSettings, close: closeSettings }] = useDisclosure();
@@ -225,6 +242,7 @@ function Header({
           setEditAndView={setEditAndView}
           defaultSyntax={defaultSyntax}
           setDefaultSyntax={setDefaultSyntax}
+          synchronize={synchronize}
         />
       </Modal>
       <Burger

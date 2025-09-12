@@ -2,6 +2,8 @@ mod types;
 use crate::types::{RemoteServer, ValueString};
 mod mysql;
 use crate::mysql::actually_sync_databases_mysql;
+mod postgres;
+use crate::postgres::actually_sync_databases_postgres;
 mod migrations;
 use crate::migrations::{SQLITE_MIGRATIONS, MYSQL_PG_MIGRATIONS};
 
@@ -69,7 +71,8 @@ fn render_adoc(value: &str) -> Result<String, String> {
     res
 }
 
-const DEFAULT_AUTO_SYNC_TIME: u32 = 5;
+// NOTE: Also defined in App.tsx as the initial state of the field
+const DEFAULT_AUTO_SYNC_TIME: u32 = 60;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -109,6 +112,7 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
                 }
                 if idx >= saved_dbs.len() {
                     idx = 0;
+                    changes_made = false;
                     if !changes_made {
                         // NOTE: no changes have been made since the last cycle - all dbs are synced
                         break;
@@ -165,18 +169,18 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
                         ).await;
                         match e_conn {
                             Ok(conn) => {
-                                // FIXME:
-                                // let e_caused_changes = actually_sync_databases(&local_conn, &conn).await;
-                                // match e_caused_changes {
-                                //     Err(e) => {errors.push(e);},
-                                //     Ok(caused_changes) => {
-                                //         changes_made = caused_changes || changes_made;
-                                //     }
-                                // }
+                                let e_caused_changes = actually_sync_databases_postgres(&local_conn, &conn).await;
+                                match e_caused_changes {
+                                    Err(e) => {errors.push(e);},
+                                    Ok(caused_changes) => {
+                                        changes_made = caused_changes || changes_made;
+                                    }
+                                }
                             },
                             Err(e) => {
-                                errors.push(e);
+                                errors.push(e.clone());
                                 saved_dbs.remove(idx);
+                                warn!("error, {e:?}, removing {idx}");
                             },
                         }
                     },

@@ -176,7 +176,7 @@ END;
 CREATE TABLE IF NOT EXISTS books (
     id VARCHAR(32) PRIMARY KEY,
     name TEXT,
-    modified DATETIME NOT NULL
+    modified TIMESTAMP NOT NULL
 );
 CREATE TABLE IF NOT EXISTS documents (
     id VARCHAR(32) PRIMARY KEY,
@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS documents (
     name TEXT,
     content TEXT,
     syntax TEXT NOT NULL,
-    modified DATETIME NOT NULL,
+    modified TIMESTAMP NOT NULL,
     FOREIGN KEY (book)
         REFERENCES books(id)
         ON DELETE CASCADE

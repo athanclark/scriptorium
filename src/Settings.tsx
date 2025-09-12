@@ -50,6 +50,7 @@ type SettingsProps = {
   setEditAndView: React.Dispatch<React.SetStateAction<boolean>>;
   defaultSyntax: Syntax;
   setDefaultSyntax: React.Dispatch<React.SetStateAction<Syntax>>;
+  synchronize: () => void;
 }
 
 // FIXME: Somehow prevent settings window from being closed until migrations are complete
@@ -61,6 +62,7 @@ function Settings({
   autoSyncTime, setAutoSyncTime,
   editAndView, setEditAndView,
   defaultSyntax, setDefaultSyntax,
+  synchronize,
 }: SettingsProps) {
   const [newRemoteServer, setNewRemoteServer] = useState<RemoteServer>(defaultRemoteServer);
   const [remoteServers, setRemoteServers] = useState<(RemoteServer & {id: string, editing: boolean, verified: boolean | string | null})[] | null>(null);
@@ -337,10 +339,11 @@ function Settings({
         setAutoSync={setAutoSync}
         autoSyncTime={autoSyncTime}
         setAutoSyncTime={setAutoSyncTime}
-          editAndView={editAndView}
-          setEditAndView={setEditAndView}
-          defaultSyntax={defaultSyntax}
-          setDefaultSyntax={setDefaultSyntax}
+        editAndView={editAndView}
+        setEditAndView={setEditAndView}
+        defaultSyntax={defaultSyntax}
+        setDefaultSyntax={setDefaultSyntax}
+        synchronize={synchronize}
       />
     </Stack>
   );
@@ -357,6 +360,7 @@ type ArbitrarySettingsProps = {
   setEditAndView: React.Dispatch<React.SetStateAction<boolean>>;
   defaultSyntax: Syntax;
   setDefaultSyntax: React.Dispatch<React.SetStateAction<Syntax>>;
+  synchronize: () => void;
 }
 
 function ArbitrarySettings({
@@ -365,6 +369,7 @@ function ArbitrarySettings({
   autoSyncTime, setAutoSyncTime,
   editAndView, setEditAndView,
   defaultSyntax, setDefaultSyntax,
+  synchronize,
 }: ArbitrarySettingsProps) {
 
   function changeColorScheme(c: ColorScheme) {
@@ -451,7 +456,7 @@ function ArbitrarySettings({
     <>
       <Switch checked={autoSync} onChange={e => changeAutoSync(e.currentTarget.checked)} label="Automatically Synchronize" />
       <NumberInput value={autoSyncTime} onChange={e => changeAutoSyncTime(e)} label="Seconds Between Synchronizations" />
-      <Button>Synchronize Now</Button>
+      <Button onClick={synchronize}>Synchronize Now</Button>
       <Divider />
       <Title order={2}>Additional Settings</Title>
       <NativeSelect

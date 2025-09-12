@@ -5,20 +5,18 @@ use sqlx::{
     Pool,
     Database,
     QueryBuilder,
-    MySql,
     Postgres,
     Sqlite,
     pool::PoolOptions,
     postgres::{PgConnectOptions, PgPool},
-    mysql::{MySqlConnectOptions, MySqlPool},
     migrate::{Migrate, Migrator},
 };
 use std::collections::{HashMap, HashSet};
 use chrono::{DateTime, Utc};
 
-pub async fn actually_sync_databases_mysql(
+pub async fn actually_sync_databases_postgres(
     local_conn: &Pool<Sqlite>,
-    remote_conn: &Pool<MySql>,
+    remote_conn: &Pool<Postgres>,
 ) -> Result<bool, String> {
     let mut has_modified = false;
 
@@ -81,14 +79,14 @@ pub async fn actually_sync_databases_mysql(
         
         if !remote_to_delete.is_empty() {
             // NOTE: Remove remote second
-            let mut add_to_delete_table = QueryBuilder::<MySql>::new("INSERT INTO deleted (id)");
+            let mut add_to_delete_table = QueryBuilder::<Postgres>::new("INSERT INTO deleted (id)");
             add_to_delete_table.push_values(remote_to_delete.clone(), |mut builder, to_delete| {
                 has_modified = true;
                 builder.push_bind(to_delete);
             });
             add_to_delete_table.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
 
-            let mut remove_from_documents = QueryBuilder::<MySql>::new("DELETE FROM documents WHERE id IN (");
+            let mut remove_from_documents = QueryBuilder::<Postgres>::new("DELETE FROM documents WHERE id IN (");
             let mut sep = remove_from_documents.separated(", ");
             for id in remote_to_delete.clone() {
                 has_modified = true;
@@ -98,7 +96,7 @@ pub async fn actually_sync_databases_mysql(
             let query = remove_from_documents.build();
             query.execute(remote_conn).await.map_err(|e| e.to_string())?;
 
-            let mut remove_from_books = QueryBuilder::<MySql>::new("DELETE FROM books WHERE id IN (");
+            let mut remove_from_books = QueryBuilder::<Postgres>::new("DELETE FROM books WHERE id IN (");
             let mut sep = remove_from_books.separated(", ");
             for id in remote_to_delete {
                 has_modified = true;
@@ -216,12 +214,7 @@ pub async fn actually_sync_databases_mysql(
                     .push_bind(row.trash);
                 has_modified = true;
             });
-            // FIXME: PostgreSQL and SQLite will use `EXCLUDED` instead of `new`
-            // FIXME: MariaDB uses `Values(name, modified, ...)` deprecated syntax -- will have to
-            // support explicitly
-            // FIXME: Also, `ON CONFLICT (id)` is only available on postgresql and sqlite
-            // query_builder.push(" ON CONFLICT (id) DO UPDATE SET name = new.name, modified = new.modified, icon = new.icon, icon_color = new.icon_color, trash = new.trash");
-            query_builder.push(" AS new ON DUPLICATE KEY UPDATE name = new.name, modified = new.modified, icon = new.icon, icon_color = new.icon_color, trash = new.trash");
+            query_builder.push(" ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, modified = EXCLUDED.modified, icon = EXCLUDED.icon, icon_color = EXCLUDED.icon_color, trash = EXCLUDED.trash");
 
             query_builder.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
         }
@@ -337,12 +330,7 @@ pub async fn actually_sync_databases_mysql(
                     .push_bind(row.icon_color);
                 has_modified = true;
             });
-            // FIXME: PostgreSQL and SQLite will use `EXCLUDED` instead of `new`
-            // FIXME: MariaDB uses `Values(name, modified, ...)` deprecated syntax -- will have to
-            // support explicitly
-            // FIXME: Also, `ON CONFLICT (id)` is only available on postgresql and sqlite
-            // query_builder.push(" ON CONFLICT (id) DO UPDATE SET name = new.name, book = new.book, modified = new.modified, content = new.content, syntax = new.syntax, icon = new.icon, icon_color = new.icon_color");
-            query_builder.push(" AS new ON DUPLICATE KEY UPDATE name = new.name, book = new.book, modified = new.modified, content = new.content, syntax = new.syntax, icon = new.icon, icon_color = new.icon_color");
+            query_builder.push(" ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, book = EXCLUDED.book, modified = EXCLUDED.modified, content = EXCLUDED.content, syntax = EXCLUDED.syntax, icon = EXCLUDED.icon, icon_color = EXCLUDED.icon_color");
 
             query_builder.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
         }
