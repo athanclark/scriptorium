@@ -3,11 +3,12 @@ import { __LOCAL_DB } from "./consts";
 import Nav from "./Nav";
 import Document from "./Document";
 import Settings from "./Settings";
+import { type Syntax } from "./Document/Editor";
 import { useState, useEffect, useRef } from "react";
-import { MantineProvider, AppShell, Burger, TextInput, Typography, ActionIcon, Modal, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, useComputedColorScheme } from "@mantine/core";
+import { MantineProvider, AppShell, Burger, Typography, ActionIcon, Modal, useComputedColorScheme } from "@mantine/core";
 import { Notifications, notifications } from "@mantine/notifications";
 import { useDisclosure } from "@mantine/hooks";
-import { IconSettings, IconPlus } from "@tabler/icons-react";
+import { IconSettings } from "@tabler/icons-react";
 import { invoke } from "@tauri-apps/api/core";
 import Database from "@tauri-apps/plugin-sql";
 import "@mantine/core/styles.css";
@@ -27,7 +28,7 @@ import "@mantine/notifications/styles.css";
 // }
 //
 
-type ColorScheme = "auto" | "light" | "dark";
+export type ColorScheme = "auto" | "light" | "dark";
 
 function App() {
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
@@ -39,7 +40,7 @@ function App() {
   const [autoSyncTime, setAutoSyncTime] = useState<number>(60);
   const [editAndView, setEditAndView] = useState<boolean>(true);
   const [defaultSyntax, setDefaultSyntax] = useState<Syntax>("md");
-  const autoSyncThreadRef = useRef(null);
+  const autoSyncThreadRef = useRef<null | number>(null);
   const [opened, { toggle }] = useDisclosure();
 
   // NOTE: may need a ref to manage threads
@@ -68,7 +69,7 @@ function App() {
         notifications.update({
           id: "sync",
           title: "Synchronizing with database",
-          message: e.join("\n") + ".\n\n Auto synchronization turned off.",
+          message: Array(e).join("\n") + ".\n\n Auto synchronization turned off.",
           color: "red",
           autoClose: false,
         })
@@ -138,7 +139,7 @@ function App() {
   }, []);
 
   return (
-    <MantineProvider forceColorScheme={colorScheme}>
+    <MantineProvider defaultColorScheme={colorScheme}>
       <Notifications />
       <AppShell
         padding="md"
@@ -188,7 +189,7 @@ function App() {
                   setSelectedDoc(null);
                   setReloadNav(!reloadNav);
                 }}
-                toBook={(newBook: string) => setSelectedBook(newBook)}
+                toBook={setSelectedBook}
                 editAndView={editAndView}
               />
               : <Info />

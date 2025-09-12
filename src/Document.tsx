@@ -17,7 +17,7 @@ type DocumentProps = {
   reload: boolean;
   onUpdateDocument: () => void;
   onDeleteDocument: () => void;
-  toBook: React.Disptach<React.SetStateAction<string | null>>;
+  toBook: React.Dispatch<React.SetStateAction<string | null>>;
   editAndView: boolean;
 };
 
@@ -221,7 +221,7 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument, toBook, edi
           variant="unstyled"
           placeholder="Click to Edit"
           className={"document-name"}
-          styles={theme => ({
+          styles={_theme => ({
             input: {
               font: "inherit",
               fontSize: "2rem",
@@ -248,7 +248,7 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument, toBook, edi
                     <Button fullWidth variant="default" onClick={openEmojiPicker} leftSection={<span>{icon}</span>}>Change Icon</Button>
                   </Grid.Col>
                   <Grid.Col span={{base: 12, md: 6, lg: 3}}>
-                    <ColorInput styles={theme => ({input: {textAlign: "center"}})} swatches={swatches} value={iconColor || ""} onChangeEnd={(c) => changeDocumentIconColor(c)} />
+                    <ColorInput styles={_theme => ({input: {textAlign: "center"}})} swatches={swatches} value={iconColor || ""} onChangeEnd={(c) => changeDocumentIconColor(c)} />
                   </Grid.Col>
                   <Grid.Col span={{base: 12, md: 6, lg: 3}}>
                     <Button fullWidth variant="default" onClick={openMoveDocument}>Move Document</Button>

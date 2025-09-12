@@ -1,11 +1,11 @@
 import { useState, useMemo, useRef, useEffect, useDeferredValue, startTransition } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { NativeSelect, Typography, Tabs, Textarea, Grid } from "@mantine/core";
+import { NativeSelect, Typography, Tabs, Grid } from "@mantine/core";
 import { useColorScheme } from "@mantine/hooks";
 import { IconEdit, IconEye } from "@tabler/icons-react";
 import DOMPurify from "dompurify";
 import CodeMirror from "@uiw/react-codemirror";
-import { markdown, markdownLanguage, markdownKeymap } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { StreamLanguage } from '@codemirror/language';
 import { asciidoc as asciidocMode } from 'codemirror-asciidoc';
@@ -161,7 +161,7 @@ function View({ value, syntax }: ViewProps) {
         if (syntax !== "html") {
           console.log("sending raw", value, syntax);
 
-          const newHtml = await invoke(`render_${syntax}`, { value: value });
+          const newHtml: string = await invoke(`render_${syntax}`, { value: value });
           console.log("received html", newHtml);
           setHtml(newHtml);
         }
@@ -209,15 +209,18 @@ function toTauriImgSrc(src?: string) {
   return src;
 }
 
+// FIXME: I should scan the resulting HTML code and apply `toTauriImgSrc` to each `src` field
+// @ts-ignore
 const Img: React.FC<JSX.IntrinsicElements['img']> = (props) => {
   const { src, ...rest } = props;
   return <img src={toTauriImgSrc(src)} {...rest} />;
 };
 
-function MathJaxBlock({ children }: { children: string }) {
+function MathJaxBlock({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // @ts-ignore
     window.MathJax?.typesetPromise([ref.current]).catch(console.error);
   }, [children]);
 

@@ -1,5 +1,6 @@
 import { __LOCAL_DB } from "../consts";
 import { otherColor, iconBackgroundStyles, swatches } from "../colors";
+import { type Syntax } from "../Document/Editor";
 import { useState, useEffect } from "react";
 import Database from "@tauri-apps/plugin-sql";
 import { Button, Divider, Title, Accordion, NavLink, Loader, Anchor, TextInput, ColorInput, Typography, Modal, Stack } from "@mantine/core";
@@ -66,7 +67,7 @@ function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax, sele
       return (<NavLink
         key={d.id}
         href="#"
-        active={selectedDoc && d.id === selectedDoc}
+        active={(selectedDoc && d.id === selectedDoc) || false}
         label={d.name === "" ? (<em>No Document Name</em>) : d.name}
         leftSection={icon}
         onClick={() => onSelectDocument(d.id)}
@@ -196,7 +197,7 @@ function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax, sele
           placeholder="Click to Edit"
           className={"book-name"}
           variant="unstyled"
-          styles={theme => ({
+          styles={_theme => ({
             input: {
               font: "inherit",
               fontSize: "1.5rem",
@@ -227,7 +228,7 @@ function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax, sele
               <Accordion.Panel>
                 <Stack>
                   <Button fullWidth variant="default" onClick={openEmojiPicker} leftSection={<span>{bookIcon}</span>}>Change Icon</Button>
-                  <ColorInput styles={theme => ({input: {textAlign: "center"}})} swatches={swatches} value={bookIconColor || ""} onChangeEnd={(c) => changeBookIconColor(c)} />
+                  <ColorInput styles={_theme => ({input: {textAlign: "center"}})} swatches={swatches} value={bookIconColor || ""} onChangeEnd={(c) => changeBookIconColor(c)} />
                   {
                     !(book === "trash") && (
                       bookTrash

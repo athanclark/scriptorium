@@ -1,12 +1,10 @@
 import React from "react";
 import { __LOCAL_DB } from "./consts";
-import Nav from "./Nav";
 import { type ColorScheme } from "./App";
-import Document from "./Document";
-import { useState, useEffect, useRef } from "react";
-import { Switch, Table, Divider, Burger, TextInput, Button, Typography, Alert, ActionIcon, Modal, Loader, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput, useComputedColorScheme } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
-import { IconSettings, IconPlus, IconCheck, IconTrash, IconCancel, IconEdit } from "@tabler/icons-react";
+import { type Syntax } from "./Document/Editor";
+import { useState, useEffect } from "react";
+import { Switch, Table, Divider, TextInput, Button, Alert, ActionIcon, Title, Grid, Stack, NativeSelect, NumberInput, PasswordInput } from "@mantine/core";
+import { IconPlus, IconCheck, IconTrash, IconCancel, IconEdit } from "@tabler/icons-react";
 import Database from "@tauri-apps/plugin-sql";
 import { invoke } from "@tauri-apps/api/core";
 import "./Settings.css";
@@ -30,7 +28,7 @@ function defaultPort(t: DatabaseType): number {
   }
 }
 
-const defaultRemoteServer = {
+const defaultRemoteServer: RemoteServer = {
   dbType: "mysql",
   host: "localhost",
   port: defaultPort("mysql"),
@@ -67,7 +65,7 @@ function Settings({
   allowToClose,
 }: SettingsProps) {
   const [newRemoteServer, setNewRemoteServer] = useState<RemoteServer>(defaultRemoteServer);
-  const [remoteServers, setRemoteServers] = useState<(RemoteServer & {id: string, editing: boolean, verified: boolean | string | null})[] | null>(null);
+  const [remoteServers, setRemoteServers] = useState<(RemoteServer & {id: string, editing: boolean, verified: boolean | string | null})[]>([]);
   const [migrating, setMigrating] = useState<number>(0);
 
   useEffect(() => {
@@ -78,16 +76,16 @@ function Settings({
     }
   }, [migrating]);
 
-  function verifyServer(s: RemoveServer & {id: string, editing: boolean, verified: boolean | string | null}) {
+  function verifyServer(s: RemoteServer & {id: string}) {
     async function go() {
       setRemoteServers(ss => ss.map(s_ => s_.id === s.id ? { ...s_, verified: null } : s_));
-      let verified;
+      let verified: boolean | string | null = null;
       try {
         setMigrating(n => n+1);
         verified = await invoke("check_database", { dbId: s.id });
         setMigrating(n => n-1);
       } catch(e) {
-        verified = e;
+        verified = String(e);
         setMigrating(n => n-1);
       }
       setRemoteServers(ss => ss.map(s_ => s_.id === s.id ? { ...s_, verified: verified } : s_));
@@ -178,55 +176,56 @@ function Settings({
     if (s.editing) {
       return (
         <Table.Tr key={s.id}>
-          <Table.Td span={2}>
+          <Table.Td>
             <NativeSelect
               label="Database Type"
               value={s.dbType}
               onChange={e => {
                 var v = e.currentTarget.selectedOptions[0].value;
                 if (v === "mysql" || v === "postgresql") {
+                  // @ts-ignore
                   editRemoteServer({ ...s, dbType: v });
                 }
               }}
               data={[{label: "MySQL", value: "mysql"}, {label: "PostgreSQL", value: "postgresql"}]}
             />
           </Table.Td>
-          <Table.Td span={2}>
+          <Table.Td>
             <TextInput
               label="Host"
               value={s.host}
               onChange={e => editRemoteServer({ ...s, host: e.currentTarget.value })}
             />
           </Table.Td>
-          <Table.Td span={1}>
+          <Table.Td>
             <NumberInput
               label="Port"
               value={s.port}
-              onChange={e => editRemoteServer({ ...s, port: e })}
+              onChange={e => editRemoteServer({ ...s, port: Number(e) })}
             />
           </Table.Td>
-          <Table.Td span={2}>
+          <Table.Td>
             <TextInput
               label="Database"
               value={s.db}
               onChange={e => editRemoteServer({ ...s, db: e.currentTarget.value })}
             />
           </Table.Td>
-          <Table.Td span={2}>
+          <Table.Td>
             <TextInput
               label="Username"
               value={s.user}
               onChange={e => editRemoteServer({ ...s, user: e.currentTarget.value })}
             />
           </Table.Td>
-          <Table.Td span={2}>
+          <Table.Td>
             <PasswordInput
               label="Password"
               value={s.password}
               onChange={e => editRemoteServer({ ...s, password: e.currentTarget.value })}
             />
           </Table.Td>
-          <Table.Td span={1} style={{display: "flex", alignItems: "center", justifyContent: "space-around"}}>
+          <Table.Td style={{display: "flex", alignItems: "center", justifyContent: "space-around"}}>
             <ActionIcon color="green" onClick={saveRemoteServer}><IconCheck /></ActionIcon>
             <ActionIcon color="red" onClick={deleteRemoteServer}><IconTrash /></ActionIcon>
             <ActionIcon color="gray" onClick={() => {
@@ -239,25 +238,25 @@ function Settings({
     } else {
       return (
         <Table.Tr key={s.id}>
-          <Table.Td span={2}>
+          <Table.Td>
             { s.dbType === "mysql" ? "MySQL" : "PostgreSQL" }
           </Table.Td>
-          <Table.Td span={2}>
+          <Table.Td>
             { s.host }
           </Table.Td>
-          <Table.Td span={1}>
+          <Table.Td>
             { s.port }
           </Table.Td>
-          <Table.Td span={2}>
+          <Table.Td>
             { s.db }
           </Table.Td>
-          <Table.Td span={2}>
+          <Table.Td>
             { s.user }
           </Table.Td>
-          <Table.Td span={2}>
+          <Table.Td>
             *****
           </Table.Td>
-          <Table.Td span={1} style={{display: "flex", alignItems: "center", justifyContent: "space-around"}}>
+          <Table.Td style={{display: "flex", alignItems: "center", justifyContent: "space-around"}}>
             <ActionIcon onClick={() => editRemoteServer({ ...s, editing: true })}><IconEdit /></ActionIcon>
           </Table.Td>
           <Table.Td>
@@ -304,7 +303,7 @@ function Settings({
           <NumberInput
             label="Port"
             value={newRemoteServer.port}
-            onChange={e => setNewRemoteServer({ ...newRemoteServer, port: e })}
+            onChange={e => setNewRemoteServer({ ...newRemoteServer, port: Number(e) })}
           />
         </Grid.Col>
         <Grid.Col span={2}>
@@ -330,7 +329,7 @@ function Settings({
         </Grid.Col>
         <Grid.Col span={1} style={{display: "flex", alignItems: "center", justifyContent: "space-around"}}>
           <ActionIcon
-            disabled={remoteServers && remoteServers.filter(s => s.host === newRemoteServer.host && s.db === newRemoteServer.db && s.port === newRemoteServer.port).length > 0}
+            disabled={(remoteServers && remoteServers.filter(s => s.host === newRemoteServer.host && s.db === newRemoteServer.db && s.port === newRemoteServer.port).length > 0) || false}
             onClick={addRemoteServer}
           ><IconPlus /></ActionIcon>
         </Grid.Col>
@@ -350,7 +349,7 @@ function Settings({
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
-          { remoteServers ? remoteServers.map(viewRemoteServer) : <Loader /> }
+          {remoteServers.map(viewRemoteServer)}
         </Table.Tbody>
       </Table>
       <Divider label="Synchronization Settings" />
@@ -477,13 +476,14 @@ function ArbitrarySettings({
   return (
     <>
       <Switch checked={autoSync} onChange={e => changeAutoSync(e.currentTarget.checked)} label="Automatically Synchronize" />
-      <NumberInput value={autoSyncTime} onChange={e => changeAutoSyncTime(e)} label="Seconds Between Synchronizations" />
+      <NumberInput value={autoSyncTime} onChange={e => changeAutoSyncTime(Number(e))} label="Seconds Between Synchronizations" />
       <Button onClick={synchronize}>Synchronize Now</Button>
       <Divider />
       <Title order={2}>Additional Settings</Title>
       <NativeSelect
         label="Color Scheme"
         value={colorScheme}
+        // @ts-ignore
         onChange={e => changeColorScheme(e.currentTarget.selectedOptions[0].value)}
         data={[
           {label: "System", value: "auto"},
@@ -495,6 +495,7 @@ function ArbitrarySettings({
       <NativeSelect
         label="Default Syntax"
         value={defaultSyntax}
+        // @ts-ignore
         onChange={e => changeDefaultSyntax(e.currentTarget.selectedOptions[0].value)}
         data={[
           {label: "Markdown", value: "md"},
