@@ -1,3 +1,4 @@
+// Copyright (C) 2025  Athan Clark
 import React from "react";
 import { __LOCAL_DB } from "./consts";
 import { type ColorScheme } from "./App";
@@ -51,9 +52,6 @@ type SettingsProps = {
   synchronize: () => void;
   allowToClose: React.Dispatch<React.SetStateAction<boolean>>;
 }
-
-// FIXME: Somehow prevent settings window from being closed until migrations are complete
-// TODO: Give notification when synchronization is happening
 
 function Settings({
   colorScheme, setColorScheme,

@@ -1,3 +1,4 @@
+// Copyright (C) 2025  Athan Clark
 import { lighten, darken } from "polished";
 
 function isLightColor(color: string): boolean {

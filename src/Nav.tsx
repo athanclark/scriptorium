@@ -1,3 +1,4 @@
+// Copyright (C) 2025  Athan Clark
 import Documents from "./Nav/Documents";
 import Books from "./Nav/Books";
 import { type Syntax } from "./Document/Editor";

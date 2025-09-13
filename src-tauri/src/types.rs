@@ -1,3 +1,4 @@
+// Copyright (C) 2025  Athan Clark
 use chrono::{DateTime, Utc};
 
 #[derive(sqlx::FromRow, Debug, Clone)]

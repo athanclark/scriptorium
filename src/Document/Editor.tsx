@@ -1,3 +1,4 @@
+// Copyright (C) 2025  Athan Clark
 import { useState, useMemo, useRef, useEffect, useDeferredValue, startTransition } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { NativeSelect, Typography, Tabs, Grid } from "@mantine/core";

@@ -1,3 +1,4 @@
+// Copyright (C) 2025  Athan Clark
 use lazy_static::lazy_static;
 use tauri_plugin_sql::{Migration, MigrationKind, MigrationList, DbInstances, DbPool};
 

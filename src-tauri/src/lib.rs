@@ -1,3 +1,4 @@
+// Copyright (C) 2025  Athan Clark
 mod types;
 use crate::types::{RemoteServer, ValueString};
 mod mysql;

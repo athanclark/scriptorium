@@ -1,3 +1,4 @@
+// Copyright (C) 2025  Athan Clark
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";

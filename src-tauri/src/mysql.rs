@@ -1,3 +1,4 @@
+// Copyright (C) 2025  Athan Clark
 use crate::types::{IdAndModified, Id, Book, Document};
 use sqlx::{
     Connection, 

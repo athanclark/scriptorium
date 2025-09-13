@@ -1,3 +1,4 @@
+// Copyright (C) 2025  Athan Clark
 import { __LOCAL_DB } from "../consts";
 import { otherColor, iconBackgroundStyles } from "../colors";
 import { useState, useEffect } from "react";
