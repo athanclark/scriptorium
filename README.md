@@ -25,10 +25,30 @@ I am not responsible for your information getting deleted, stolen, or otherwise 
 
 ## Building from Source
 
+First, make sure you have the following installed:
 
+- [Rust Toolchain](https://rustup.rs/) (just use the `stable` toolchain)
+- [NodeJS](https://nodejs.org/en) (I'm using v24 on my development environment, but the GitHub build workflow is using version 22)
+- [PNPM](https://pnpm.io/)
+- [rsync](https://linux.die.net/man/1/rsync) (on windows it can be [installed via chocolatey](https://community.chocolatey.org/packages/rsync/5.4.1.1))
+- [WebKit2 GTK 4.1](https://webkitgtk.org/reference/webkit2gtk/2.38.4/)
+
+Then, install the dependencies
 
 ```bash
 pnpm install
+```
+
+You can get a "live-reload" development system by running this:
+
+```bash
 pnpm tauri dev
 ```
 
+And build a production version on your operating system with
+
+```bash
+NO_STRIP=1 pnpm tauri build
+```
+
+> The `NO_STRIP` variable is set because I can't get my AppImage linked libraries to get parsed without it. Idk.
