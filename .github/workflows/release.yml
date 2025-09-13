@@ -1,0 +1,79 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  BIN_NAME: mnemonic-hasher
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux (x86_64)
+          - os: ubuntu-22.04
+            args: ""
+          # Windows (x86_64)
+          - os: windows-latest
+            args: ""
+          # macOS (Apple Silicon)
+          - os: macos-latest
+            args: "--target aarch64-apple-darwin"
+          # macOS (Intel)
+          - os: macos-latest
+            args: "--target x86_64-apple-darwin"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install pnpm
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          version: 20
+          cache: "pnpm"
+
+      # Install Rust toolchain + target
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # Install both mac targets on macOS runners so we can cross-build each job quickly.
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install Linux build deps
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          # Tauri v2 needs webkit2gtk 4.1; patchelf is needed by the bundler.
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      # Install dependencies
+      - name: Install pnpm dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build & publish with tauri-action
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Workarounds for linuxdeploy quirks when stripping/using FUSE:
+          NO_STRIP: "1"                 # avoids strip failures on libs with .relr.dyn
+          APPIMAGE_EXTRACT_AND_RUN: "1" # runs AppImages without FUSE
+        with:
+          # Let the action create/find the release for this tag and upload artifacts.
+          tagName: v__VERSION__
+          releaseName: "scriptorium v__VERSION__"
+          releaseBody: "See the assets to download this version."
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
+          tauriScript: pnpm tauri
+          projectPath: .
