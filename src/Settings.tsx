@@ -144,7 +144,7 @@ function Settings({
         try {
           const db = await Database.load(__LOCAL_DB);
           await db.execute(
-            "UPDATE remote_servers (host, port, db, user, password, db_type) SET ($1, $2, $3, $4, $5, $6) WHERE id = $7",
+            "UPDATE remote_servers SET host = $1, port = $2, db = $3, user = $4, password = $5, db_type = $6 WHERE id = $7",
             [s.host, s.port, s.db, s.user, s.password, s.dbType, s.id]
           );
           actuallyReload();

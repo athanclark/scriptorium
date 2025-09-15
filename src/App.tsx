@@ -66,6 +66,7 @@ function App() {
           color: "green",
           autoClose: true,
         });
+        setReloadNav(!reloadNav);
       } catch(e) {
         console.warn("sync_databases failed", e);
         notifications.update({
@@ -76,6 +77,11 @@ function App() {
           autoClose: false,
         })
         setAutoSync(false);
+        const db = await Database.load(__LOCAL_DB);
+        await db.execute(
+          "UPDATE settings SET value = 'false' WHERE key = 'auto_sync'",
+          []
+        );
       }
     }
     go();

@@ -168,7 +168,7 @@ END;
         },
     ]);
 
-    pub static ref MYSQL_PG_MIGRATIONS: MigrationList = MigrationList(vec![
+    pub static ref MYSQL_MIGRATIONS: MigrationList = MigrationList(vec![
         Migration {
             version: 1,
             description: "create_initial_tables",
@@ -221,6 +221,72 @@ CHECK (trash IN (0, 1));
 CREATE TABLE IF NOT EXISTS deleted (
     id VARCHAR(32) PRIMARY KEY
 );
+",
+        },
+    ]);
+
+    pub static ref PG_MIGRATIONS: MigrationList = MigrationList(vec![
+        Migration {
+            version: 1,
+            description: "create_initial_tables",
+            kind: MigrationKind::Up,
+            sql: "
+CREATE TABLE IF NOT EXISTS books (
+    id VARCHAR(32) PRIMARY KEY,
+    name TEXT,
+    modified TIMESTAMP NOT NULL
+);
+CREATE TABLE IF NOT EXISTS documents (
+    id VARCHAR(32) PRIMARY KEY,
+    book VARCHAR(32) NOT NULL,
+    name TEXT,
+    content TEXT,
+    syntax TEXT NOT NULL,
+    modified TIMESTAMP NOT NULL,
+    FOREIGN KEY (book)
+        REFERENCES books(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+",
+        },
+        Migration {
+            version: 3,
+            description: "add_icons_to_books_and_documents",
+            kind: MigrationKind::Up,
+            sql: "
+ALTER TABLE books ADD COLUMN icon TEXT;
+ALTER TABLE books ADD COLUMN icon_color TEXT;
+ALTER TABLE documents ADD COLUMN icon TEXT;
+ALTER TABLE documents ADD COLUMN icon_color TEXT;
+",
+        },
+        Migration {
+            version: 4,
+            description: "trash",
+            kind: MigrationKind::Up,
+            sql: "
+ALTER TABLE books ADD COLUMN trash INTEGER NOT NULL DEFAULT 0
+CHECK (trash IN (0, 1));
+",
+        },
+        Migration {
+            version: 5,
+            description: "permanently_deleted",
+            kind: MigrationKind::Up,
+            sql: "
+CREATE TABLE IF NOT EXISTS deleted (
+    id VARCHAR(32) PRIMARY KEY
+);
+",
+        },
+        Migration {
+            version: 6,
+            description: "utc_timestamp",
+            kind: MigrationKind::Up,
+            sql: "
+ALTER TABLE books ALTER COLUMN modified TYPE TIMESTAMPTZ;
+ALTER TABLE documents ALTER COLUMN modified TYPE TIMESTAMPTZ;
 ",
         },
     ]);

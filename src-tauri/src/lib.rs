@@ -6,7 +6,7 @@ use crate::mysql::actually_sync_databases_mysql;
 mod postgres;
 use crate::postgres::actually_sync_databases_postgres;
 mod migrations;
-use crate::migrations::{SQLITE_MIGRATIONS, MYSQL_PG_MIGRATIONS};
+use crate::migrations::{SQLITE_MIGRATIONS, MYSQL_MIGRATIONS, PG_MIGRATIONS};
 
 use tauri::{
     State,
@@ -134,7 +134,7 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
                             .ssl_mode(MySqlSslMode::Required);
                         let e_conn: Result<MySqlPool, String> = run_migrations_and_get_pool(
                             conn_options,
-                            MYSQL_PG_MIGRATIONS.clone(),
+                            MYSQL_MIGRATIONS.clone(),
                             auto_sync_time,
                         ).await;
                         info!("e_conn returned");
@@ -165,7 +165,7 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
                             .ssl_mode(PgSslMode::VerifyFull);
                         let e_conn: Result<PgPool, String> = run_migrations_and_get_pool(
                             conn_options,
-                            MYSQL_PG_MIGRATIONS.clone(),
+                            PG_MIGRATIONS.clone(),
                             auto_sync_time,
                         ).await;
                         match e_conn {
@@ -241,7 +241,7 @@ async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Re
                         .ssl_mode(MySqlSslMode::Required);
                     let conn: MySqlPool = run_migrations_and_get_pool(
                         conn_options,
-                        MYSQL_PG_MIGRATIONS.clone(),
+                        MYSQL_MIGRATIONS.clone(),
                         auto_sync_time,
                     ).await?;
                     // let conn = MySqlPool::connect_with(conn_options).await.map_err(|e| e.to_string())?;
@@ -259,7 +259,7 @@ async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Re
                         .ssl_mode(PgSslMode::VerifyFull);
                     let conn: PgPool = run_migrations_and_get_pool(
                         conn_options,
-                        MYSQL_PG_MIGRATIONS.clone(),
+                        PG_MIGRATIONS.clone(),
                         auto_sync_time,
                     ).await?;
                     // let conn = PgPool::connect_with(conn_options).await.map_err(|e| e.to_string())?;
