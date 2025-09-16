@@ -1,3 +1,5 @@
+![Scriptorium Icon](assets/app-icon.svg)
+
 # Scriptorium
 
 > A Simple Note-Taking Application
