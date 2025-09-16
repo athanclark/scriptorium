@@ -9,8 +9,87 @@ env:
   BIN_NAME: mnemonic-hasher
 
 jobs:
+  version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify versions match tag
+        run: |
+          python - <<'PY'
+          import json, os, sys, re, pathlib
+          try:
+              import tomllib  # Python 3.11+ on ubuntu-latest
+          except Exception as e:
+              print("Python >=3.11 required for tomllib", file=sys.stderr)
+              sys.exit(2)
+
+          tag = os.environ.get("GITHUB_REF_NAME","")
+          if not tag:
+              print("GITHUB_REF_NAME not set; are we on a tag ref?", file=sys.stderr)
+              sys.exit(2)
+
+          # Accept tags like v1.2.3 or 1.2.3 (keeps the numeric part)
+          m = re.fullmatch(r'v?(\d+\.\d+\.\d+(?:[-+].*)?)', tag)
+          if not m:
+              print(f"Tag '{tag}' doesn't look like a semver (vMAJOR.MINOR.PATCH[prerelease+build])", file=sys.stderr)
+              sys.exit(2)
+          tagver = m.group(1)
+
+          root = pathlib.Path(".")
+          errors = []
+
+          # package.json
+          pkg_path = root / "package.json"
+          try:
+              pkgver = json.loads(pkg_path.read_text())["version"]
+          except Exception as e:
+              print(f"Failed reading version from {pkg_path}: {e}", file=sys.stderr); sys.exit(2)
+
+          # tauri.conf.json (either at repo root or under src-tauri/)
+          tauri_path = root / "tauri.conf.json"
+          if not tauri_path.exists():
+              tauri_path = root / "src-tauri" / "tauri.conf.json"
+          try:
+              tauri = json.loads(tauri_path.read_text())
+              # Tauri can store version at package.version or top-level version
+              tauriver = (tauri.get("package") or {}).get("version") or tauri.get("version")
+          except Exception as e:
+              print(f"Failed reading version from {tauri_path}: {e}", file=sys.stderr); sys.exit(2)
+
+          # src-tauri/Cargo.toml (typical Tauri layout)
+          cargo_path = root / "src-tauri" / "Cargo.toml"
+          try:
+              cargover = tomllib.loads(cargo_path.read_text())["package"]["version"]
+          except Exception as e:
+              print(f"Failed reading version from {cargo_path}: {e}", file=sys.stderr); sys.exit(2)
+
+          # Report and compare
+          print(f"git tag        : {tagver}")
+          print(f"package.json   : {pkgver}")
+          print(f"Cargo.toml     : {cargover}")
+          print(f"tauri.conf.json: {tauriver}")
+
+          mismatches = []
+          for name, v in [("package.json", pkgver), ("Cargo.toml", cargover), ("tauri.conf.json", tauriver)]:
+              if v != tagver:
+                  mismatches.append((name, v))
+
+          if mismatches:
+              print("\nVersion mismatch detected:", file=sys.stderr)
+              for n, v in mismatches:
+                  print(f" - {n}: {v} != {tagver}", file=sys.stderr)
+              sys.exit(1)
+          else:
+              print("\nAll versions match the tag.")
+          PY
+
   build:
     name: build (${{ matrix.target }})
+    needs: version-check
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
