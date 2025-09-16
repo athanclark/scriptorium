@@ -3,7 +3,7 @@ import Documents from "./Nav/Documents";
 import Books from "./Nav/Books";
 import { type Syntax } from "./Document/Editor";
 import { __LOCAL_DB } from "./consts";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Transition } from "@mantine/core";
 import "./Nav.css";
 
@@ -21,6 +21,10 @@ function Nav({ onSelectDocument, onChangeBooks, reload, selectedBook, setSelecte
   // immediate change - used for navigation
   const [bookIsSelected, setBookIsSelected] = useState<boolean>(false);
   const [reloadBooks, setReloadBooks] = useState(false);
+
+  useEffect(() => {
+    setReloadBooks(!reloadBooks);
+  }, [reload])
 
   return (
     <div className="nav">
