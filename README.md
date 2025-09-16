@@ -117,7 +117,7 @@ This will now allow our `mysql` or `postgres` user to read those certificates an
 
 For MySQL, you'll have to adjust your `mysqld.conf` file (typically anyway -- your system may differ):
 
-```conf
+```ini
 # TLS
 ssl_cert = /etc/letsencrypt/live/sql.example.com/cert.pem
 ssl_key  = /etc/letsencrypt/live/sql.example.com/privkey.pem
@@ -136,7 +136,7 @@ I just appended this to my `mysqld.conf` file.
 
 Similarly, here's the configuration for `postgresql.conf`:
 
-```conf
+```ini
 ssl = on
 ssl_cert_file = '/etc/letsencrypt/live/sql.example.com/fullchain.pem'
 ssl_key_file  = '/etc/letsencrypt/live/sql.example.com/privkey.pem'
