@@ -1,4 +1,4 @@
-![Scriptorium Icon](assets/app-icon.svg)
+<img src="assets/app-icon.svg" style="width: 200px; height: 200px" />
 
 # Scriptorium
 
