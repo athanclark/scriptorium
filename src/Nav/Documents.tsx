@@ -204,6 +204,7 @@ function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax, sele
           variant="unstyled"
           styles={_theme => ({
             input: {
+              paddingRight: "1rem",
               font: "inherit",
               fontSize: "1.5rem",
               fontStyle: bookName ? "inherit" : "italic",
