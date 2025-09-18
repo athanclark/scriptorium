@@ -48,7 +48,6 @@ function Books({ onSelectBook, clearSelectedDocument, reload }: BooksProps) {
     const icon = b.icon ? (<span style={iconStyles}>{b.icon}</span>) : null;
     return (<NavLink
       key={b.id}
-      href="#"
       label={b.name === "" ? "No Name" : b.name}
       style={{
         fontStyle: b.name === "" ? "italic" : "",

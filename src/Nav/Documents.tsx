@@ -67,7 +67,6 @@ function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax, sele
       const icon = d.icon ? (<span style={iconStyles}>{d.icon}</span>) : null;
       return (<NavLink
         key={d.id}
-        href="#"
         active={(selectedDoc && d.id === selectedDoc) || false}
         label={d.name === "" ? (<em>No Document Name</em>) : d.name}
         leftSection={icon}
@@ -197,7 +196,7 @@ function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax, sele
         }} />
       </Modal>
       <Stack>
-        <Anchor href="#" onClick={goBack}><IconArrowLeft size={12} /> All Books</Anchor>
+        <Anchor onClick={goBack}><IconArrowLeft size={12} /> All Books</Anchor>
         <TextInput
           leftSection={icon}
           placeholder="Click to Edit"
