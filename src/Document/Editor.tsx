@@ -184,6 +184,8 @@ function View({ value, syntax }: ViewProps) {
         (s.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(s) || s.startsWith("file://"));
     }
 
+    const promises = [];
+
     tmp.querySelectorAll("img,source,video,audio").forEach(el => {
       const src = el.getAttribute("src");
       if (src && isLocal(src)) {
@@ -209,11 +211,12 @@ function View({ value, syntax }: ViewProps) {
                 el.parentElement.dataset.error = String(e);
             }
           }
-          setRewrittenHtml(tmp.innerHTML);
         }
-        go();
+        promises.push(go());
       }
     });
+
+    Promise.all(promises).then(() => setRewrittenHtml(tmp.innerHTML));
   }, [html])
 
   const renderedValue = (syntax === "md" || syntax === "adoc" || syntax === "html")
