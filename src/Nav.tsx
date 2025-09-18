@@ -27,7 +27,7 @@ function Nav({ onSelectDocument, onChangeBooks, reload, selectedBook, setSelecte
   }, [reload])
 
   return (
-    <div className="nav">
+    <div className="nav" style={{overflowY: "auto"}}>
       <Transition
         mounted={!bookIsSelected}
         transition="fade-right"
