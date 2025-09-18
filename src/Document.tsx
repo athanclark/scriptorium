@@ -214,7 +214,7 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument, toBook, edi
             changeDocumentIcon(emoji.native);
             // closeEmojiPicker();
           }} />
-        <TextInput value={icon} placeholder="No Icon" onChange={e => changeDocumentIcon(e.currentTarget.value)} label="Current Icon" />
+        <TextInput value={icon || undefined} placeholder="No Icon" onChange={e => changeDocumentIcon(e.currentTarget.value)} label="Current Icon" />
       </Modal>
       <Stack>
         <TextInput
