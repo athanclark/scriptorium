@@ -178,7 +178,7 @@ function View({ value, syntax }: ViewProps) {
     const clean = DOMPurify.sanitize(html);
     const tmp = document.createElement("div");
     tmp.innerHTML = clean;
-    function isLocal(s) {
+    function isLocal(s: string) {
       return s &&
         !/^https?:|^data:|^tauri:|^asset:/.test(s) &&
         (s.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(s) || s.startsWith("file://"));
@@ -194,15 +194,20 @@ function View({ value, syntax }: ViewProps) {
               el.setAttribute("src", convertFileSrc(rawSrc));
             } else {
               el.setAttribute("src", "");
-              el.dataset.src = rawSrc;
-              el.dataset.notFound = true;
+              if (el instanceof HTMLElement) {
+                el.dataset.src = rawSrc;
+                el.dataset.notFound = "true";
+              }
             }
           } catch(e) {
             console.warn("error thrown when checking if file exists", e);
             el.setAttribute("src", "");
-            el.dataset.src = rawSrc;
-            el.dataset.error = e;
-            el.parentElement.dataset.error = e;
+            if (el instanceof HTMLElement) {
+              el.dataset.src = rawSrc;
+              el.dataset.error = String(e);
+              if (el.parentElement)
+                el.parentElement.dataset.error = String(e);
+            }
           }
           setRewrittenHtml(tmp.innerHTML);
         }
