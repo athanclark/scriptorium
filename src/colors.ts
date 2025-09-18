@@ -22,9 +22,14 @@ function isLightColor(color: string): boolean {
 
 export function otherColor(color: string): string {
   const factor = 0.2
-  return isLightColor(color)
-    ? darken(factor, color)
-    : lighten(factor, color);
+  try {
+    return isLightColor(color)
+      ? darken(factor, color)
+      : lighten(factor, color);
+  } catch(e) {
+    console.warn("failed to compute color", e);
+    return color;
+  }
 }
 
 export const iconBackgroundStyles = {

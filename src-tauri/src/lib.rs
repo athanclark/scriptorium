@@ -6,36 +6,26 @@ use crate::mysql::actually_sync_databases_mysql;
 mod postgres;
 use crate::postgres::actually_sync_databases_postgres;
 mod migrations;
-use crate::migrations::{SQLITE_MIGRATIONS, MYSQL_MIGRATIONS, PG_MIGRATIONS};
+use crate::migrations::{MYSQL_MIGRATIONS, PG_MIGRATIONS, SQLITE_MIGRATIONS};
 
+use asciidocr as adoc;
+use chrono::{DateTime, Utc};
+use lazy_static::lazy_static;
+use log::{debug, info, warn};
+use pulldown_cmark as md;
+use sqlx::{
+    migrate::{Migrate, Migrator},
+    mysql::{MySqlConnectOptions, MySqlPool, MySqlSslMode},
+    pool::PoolOptions,
+    postgres::{PgConnectOptions, PgPool, PgSslMode},
+    ConnectOptions, Connection, Database, MySql, Pool, Postgres, QueryBuilder, Sqlite,
+};
+use std::{str::FromStr, time::Duration};
 use tauri::{
     State,
     // menu::{Menu, Submenu, MenuItem}
 };
-use tauri_plugin_sql::{Migration, MigrationKind, MigrationList, DbInstances, DbPool};
-use chrono::{DateTime, Utc};
-use log::{warn, info, debug};
-use pulldown_cmark as md;
-use asciidocr as adoc;
-use lazy_static::lazy_static;
-use sqlx::{
-    Connection, 
-    ConnectOptions,
-    Pool,
-    Database,
-    QueryBuilder,
-    MySql,
-    Postgres,
-    Sqlite,
-    pool::PoolOptions,
-    postgres::{PgConnectOptions, PgPool, PgSslMode},
-    mysql::{MySqlConnectOptions, MySqlPool, MySqlSslMode},
-    migrate::{Migrate, Migrator},
-};
-use std::{
-    time::Duration,
-    str::FromStr,
-};
+use tauri_plugin_sql::{DbInstances, DbPool, Migration, MigrationKind, MigrationList};
 
 #[tauri::command]
 fn render_md(value: &str) -> String {
@@ -80,25 +70,30 @@ const DEFAULT_AUTO_SYNC_TIME: u32 = 60;
 async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<String>> {
     let instances = db_instances.0.read().await;
 
-    let db = instances.get("sqlite:scriptorium.db").ok_or_else(|| vec!["database not loaded".to_string()])?;
+    let db = instances
+        .get("sqlite:scriptorium.db")
+        .ok_or_else(|| vec!["database not loaded".to_string()])?;
 
     match db {
         DbPool::Sqlite(local_conn) => {
-            let auto_sync_time: u32 = sqlx::query_as("SELECT value FROM settings WHERE key = 'auto_sync_time'")
-                .fetch_all(local_conn)
-                .await
-                .map_err(|e| vec![e.to_string()])
-                .and_then(|vs: Vec<ValueString>| {
-                    if vs.len() > 0 {
-                        u32::from_str(&vs[0].value).map_err(|e| vec![e.to_string()])
-                    } else {
-                        Ok(5)
-                    }
-                })?;
-            let mut saved_dbs: Vec<RemoteServer> = sqlx::query_as("SELECT id, host, port, db, user, password, db_type FROM remote_servers")
-                .fetch_all(local_conn)
-                .await
-                .map_err(|e| vec![e.to_string()])?;
+            let auto_sync_time: u32 =
+                sqlx::query_as("SELECT value FROM settings WHERE key = 'auto_sync_time'")
+                    .fetch_all(local_conn)
+                    .await
+                    .map_err(|e| vec![e.to_string()])
+                    .and_then(|vs: Vec<ValueString>| {
+                        if vs.len() > 0 {
+                            u32::from_str(&vs[0].value).map_err(|e| vec![e.to_string()])
+                        } else {
+                            Ok(5)
+                        }
+                    })?;
+            let mut saved_dbs: Vec<RemoteServer> = sqlx::query_as(
+                "SELECT id, host, port, db, user, password, db_type FROM remote_servers",
+            )
+            .fetch_all(local_conn)
+            .await
+            .map_err(|e| vec![e.to_string()])?;
             let mut changes_made = false;
             let mut errors: Vec<String> = vec![];
             let mut idx = 0;
@@ -136,25 +131,29 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
                             conn_options,
                             MYSQL_MIGRATIONS.clone(),
                             auto_sync_time,
-                        ).await;
+                        )
+                        .await;
                         info!("e_conn returned");
                         match e_conn {
                             Ok(conn) => {
-                                let e_caused_changes = actually_sync_databases_mysql(&local_conn, &conn).await;
+                                let e_caused_changes =
+                                    actually_sync_databases_mysql(&local_conn, &conn).await;
                                 match e_caused_changes {
-                                    Err(e) => {errors.push(e);},
+                                    Err(e) => {
+                                        errors.push(e);
+                                    }
                                     Ok(caused_changes) => {
                                         changes_made = caused_changes || changes_made;
                                     }
                                 }
-                            },
+                            }
                             Err(e) => {
                                 errors.push(e.clone());
                                 saved_dbs.remove(idx);
                                 warn!("error, {e:?}, removing {idx}");
-                            },
+                            }
                         }
-                    },
+                    }
                     "postgresql" => {
                         let conn_options = PgConnectOptions::new()
                             .host(&saved_db.host)
@@ -167,27 +166,34 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
                             conn_options,
                             PG_MIGRATIONS.clone(),
                             auto_sync_time,
-                        ).await;
+                        )
+                        .await;
                         match e_conn {
                             Ok(conn) => {
-                                let e_caused_changes = actually_sync_databases_postgres(&local_conn, &conn).await;
+                                let e_caused_changes =
+                                    actually_sync_databases_postgres(&local_conn, &conn).await;
                                 match e_caused_changes {
-                                    Err(e) => {errors.push(e);},
+                                    Err(e) => {
+                                        errors.push(e);
+                                    }
                                     Ok(caused_changes) => {
                                         changes_made = caused_changes || changes_made;
                                     }
                                 }
-                            },
+                            }
                             Err(e) => {
                                 errors.push(e.clone());
                                 saved_dbs.remove(idx);
                                 warn!("error, {e:?}, removing {idx}");
-                            },
+                            }
                         }
-                    },
+                    }
                     _ => {
-                        errors.push(format!("Unrecognized database type: {:?}", saved_db.db_type));
-                    },
+                        errors.push(format!(
+                            "Unrecognized database type: {:?}",
+                            saved_db.db_type
+                        ));
+                    }
                 }
 
                 idx += 1;
@@ -207,21 +213,24 @@ async fn sync_databases(db_instances: State<'_, DbInstances>) -> Result<(), Vec<
 async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Result<bool, String> {
     let instances = db_instances.0.read().await;
 
-    let db = instances.get("sqlite:scriptorium.db").ok_or_else(|| "database not loaded".to_string())?;
+    let db = instances
+        .get("sqlite:scriptorium.db")
+        .ok_or_else(|| "database not loaded".to_string())?;
 
     match db {
         DbPool::Sqlite(local_conn) => {
-            let auto_sync_time: u32 = sqlx::query_as("SELECT value FROM settings WHERE key = 'auto_sync_time'")
-                .fetch_all(local_conn)
-                .await
-                .map_err(|e| e.to_string())
-                .and_then(|vs: Vec<ValueString>| {
-                    if vs.len() > 0 {
-                        u32::from_str(&vs[0].value).map_err(|e| e.to_string())
-                    } else {
-                        Ok(5)
-                    }
-                })?;
+            let auto_sync_time: u32 =
+                sqlx::query_as("SELECT value FROM settings WHERE key = 'auto_sync_time'")
+                    .fetch_all(local_conn)
+                    .await
+                    .map_err(|e| e.to_string())
+                    .and_then(|vs: Vec<ValueString>| {
+                        if vs.len() > 0 {
+                            u32::from_str(&vs[0].value).map_err(|e| e.to_string())
+                        } else {
+                            Ok(5)
+                        }
+                    })?;
             let saved_db: RemoteServer = sqlx::query_as("SELECT id, host, port, db, user, password, db_type FROM remote_servers WHERE id = ?")
                 .bind(db_id)
                 .fetch_one(local_conn)
@@ -243,12 +252,13 @@ async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Re
                         conn_options,
                         MYSQL_MIGRATIONS.clone(),
                         auto_sync_time,
-                    ).await?;
+                    )
+                    .await?;
                     // let conn = MySqlPool::connect_with(conn_options).await.map_err(|e| e.to_string())?;
                     // let migrator = Migrator::new(MIGRATIONS.clone()).await.map_err(|e| e.to_string())?;
                     // migrator.run(&conn).await.map_err(|e| e.to_string())?;
                     Ok(true)
-                },
+                }
                 "postgresql" => {
                     let conn_options = PgConnectOptions::new()
                         .host(&saved_db.host)
@@ -261,15 +271,17 @@ async fn check_database(db_instances: State<'_, DbInstances>, db_id: &str) -> Re
                         conn_options,
                         PG_MIGRATIONS.clone(),
                         auto_sync_time,
-                    ).await?;
+                    )
+                    .await?;
                     // let conn = PgPool::connect_with(conn_options).await.map_err(|e| e.to_string())?;
                     // let migrator = Migrator::new(MIGRATIONS.clone()).await.map_err(|e| e.to_string())?;
                     // migrator.run(&conn).await.map_err(|e| e.to_string())?;
                     Ok(true)
-                },
-                _ => {
-                    Err(format!("Unrecognized database type: {:?}", saved_db.db_type))
                 }
+                _ => Err(format!(
+                    "Unrecognized database type: {:?}",
+                    saved_db.db_type
+                )),
             }
         }
         _ => Err("unexpected primary database".to_string()),
@@ -281,13 +293,19 @@ pub fn run() {
     env_logger::init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:scriptorium.db", SQLITE_MIGRATIONS.0.clone())
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![sync_databases, check_database, render_md, render_adoc])
+        .invoke_handler(tauri::generate_handler![
+            sync_databases,
+            check_database,
+            render_md,
+            render_adoc
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -298,7 +316,7 @@ async fn run_migrations_and_get_pool<DB: Database>(
     auto_sync_time: u32,
 ) -> Result<Pool<DB>, String>
 where
-    <DB as Database>::Connection: Migrate
+    <DB as Database>::Connection: Migrate,
 {
     let conn = PoolOptions::new()
         .acquire_timeout(Duration::from_secs(auto_sync_time as u64 - 1))

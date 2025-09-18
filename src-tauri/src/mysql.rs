@@ -1,21 +1,14 @@
 // Copyright (C) 2025  Athan Clark
-use crate::types::{IdAndModified, Id, Book, Document};
+use crate::types::{Book, Document, Id, IdAndModified};
+use chrono::{DateTime, Utc};
 use sqlx::{
-    Connection, 
-    ConnectOptions,
-    Pool,
-    Database,
-    QueryBuilder,
-    MySql,
-    Postgres,
-    Sqlite,
+    migrate::{Migrate, Migrator},
+    mysql::{MySqlConnectOptions, MySqlPool},
     pool::PoolOptions,
     postgres::{PgConnectOptions, PgPool},
-    mysql::{MySqlConnectOptions, MySqlPool},
-    migrate::{Migrate, Migrator},
+    ConnectOptions, Connection, Database, MySql, Pool, Postgres, QueryBuilder, Sqlite,
 };
 use std::collections::{HashMap, HashSet};
-use chrono::{DateTime, Utc};
 
 pub async fn actually_sync_databases_mysql(
     local_conn: &Pool<Sqlite>,
@@ -25,24 +18,18 @@ pub async fn actually_sync_databases_mysql(
 
     {
         // NOTE: Sync Deleted Books /////////////////////////////////
-        let all_local_deletions: Vec<Id> =
-            sqlx::query_as("SELECT id FROM deleted")
+        let all_local_deletions: Vec<Id> = sqlx::query_as("SELECT id FROM deleted")
             .fetch_all(local_conn)
             .await
             .map_err(|e| e.to_string())?;
-        let all_remote_deletions: Vec<Id> =
-            sqlx::query_as("SELECT id FROM deleted")
+        let all_remote_deletions: Vec<Id> = sqlx::query_as("SELECT id FROM deleted")
             .fetch_all(remote_conn)
             .await
             .map_err(|e| e.to_string())?;
-        let all_local_deletions: HashSet<String> = all_local_deletions
-            .into_iter()
-            .map(|kv| kv.id)
-            .collect();
-        let all_remote_deletions: HashSet<String> = all_remote_deletions
-            .into_iter()
-            .map(|kv| kv.id)
-            .collect();
+        let all_local_deletions: HashSet<String> =
+            all_local_deletions.into_iter().map(|kv| kv.id).collect();
+        let all_remote_deletions: HashSet<String> =
+            all_remote_deletions.into_iter().map(|kv| kv.id).collect();
         let local_to_delete: HashSet<&String> = all_remote_deletions
             .difference(&all_local_deletions)
             .collect();
@@ -57,9 +44,14 @@ pub async fn actually_sync_databases_mysql(
                 has_modified = true;
                 builder.push_bind(to_delete);
             });
-            add_to_delete_table.build().execute(local_conn).await.map_err(|e| e.to_string())?;
+            add_to_delete_table
+                .build()
+                .execute(local_conn)
+                .await
+                .map_err(|e| e.to_string())?;
 
-            let mut remove_from_documents = QueryBuilder::<Sqlite>::new("DELETE FROM documents WHERE id IN (");
+            let mut remove_from_documents =
+                QueryBuilder::<Sqlite>::new("DELETE FROM documents WHERE id IN (");
             let mut sep = remove_from_documents.separated(", ");
             for id in local_to_delete.clone() {
                 has_modified = true;
@@ -69,7 +61,8 @@ pub async fn actually_sync_databases_mysql(
             let query = remove_from_documents.build();
             query.execute(local_conn).await.map_err(|e| e.to_string())?;
 
-            let mut remove_from_books = QueryBuilder::<Sqlite>::new("DELETE FROM books WHERE id IN (");
+            let mut remove_from_books =
+                QueryBuilder::<Sqlite>::new("DELETE FROM books WHERE id IN (");
             let mut sep = remove_from_books.separated(", ");
             for id in local_to_delete {
                 has_modified = true;
@@ -79,7 +72,7 @@ pub async fn actually_sync_databases_mysql(
             let query = remove_from_books.build();
             query.execute(local_conn).await.map_err(|e| e.to_string())?;
         }
-        
+
         if !remote_to_delete.is_empty() {
             // NOTE: Remove remote second
             let mut add_to_delete_table = QueryBuilder::<MySql>::new("INSERT INTO deleted (id)");
@@ -87,9 +80,14 @@ pub async fn actually_sync_databases_mysql(
                 has_modified = true;
                 builder.push_bind(to_delete);
             });
-            add_to_delete_table.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
+            add_to_delete_table
+                .build()
+                .execute(remote_conn)
+                .await
+                .map_err(|e| e.to_string())?;
 
-            let mut remove_from_documents = QueryBuilder::<MySql>::new("DELETE FROM documents WHERE id IN (");
+            let mut remove_from_documents =
+                QueryBuilder::<MySql>::new("DELETE FROM documents WHERE id IN (");
             let mut sep = remove_from_documents.separated(", ");
             for id in remote_to_delete.clone() {
                 has_modified = true;
@@ -97,9 +95,13 @@ pub async fn actually_sync_databases_mysql(
             }
             sep.push_unseparated(")");
             let query = remove_from_documents.build();
-            query.execute(remote_conn).await.map_err(|e| e.to_string())?;
+            query
+                .execute(remote_conn)
+                .await
+                .map_err(|e| e.to_string())?;
 
-            let mut remove_from_books = QueryBuilder::<MySql>::new("DELETE FROM books WHERE id IN (");
+            let mut remove_from_books =
+                QueryBuilder::<MySql>::new("DELETE FROM books WHERE id IN (");
             let mut sep = remove_from_books.separated(", ");
             for id in remote_to_delete {
                 has_modified = true;
@@ -107,19 +109,20 @@ pub async fn actually_sync_databases_mysql(
             }
             sep.push_unseparated(")");
             let query = remove_from_books.build();
-            query.execute(remote_conn).await.map_err(|e| e.to_string())?;
+            query
+                .execute(remote_conn)
+                .await
+                .map_err(|e| e.to_string())?;
         }
     }
 
     {
         // NOTE: Sync Existing Books ///////////////////////////////
-        let all_local_books: Vec<IdAndModified> =
-            sqlx::query_as("SELECT id, modified FROM books")
+        let all_local_books: Vec<IdAndModified> = sqlx::query_as("SELECT id, modified FROM books")
             .fetch_all(local_conn)
             .await
             .map_err(|e| e.to_string())?;
-        let all_remote_books: Vec<IdAndModified> =
-            sqlx::query_as("SELECT id, modified FROM books")
+        let all_remote_books: Vec<IdAndModified> = sqlx::query_as("SELECT id, modified FROM books")
             .fetch_all(remote_conn)
             .await
             .map_err(|e| e.to_string())?;
@@ -136,11 +139,11 @@ pub async fn actually_sync_databases_mysql(
             match all_local_books.get(remote_id) {
                 None => {
                     upsert_to_local.insert(remote_id.clone());
-                },
+                }
                 Some(local_modified) if remote_modified > local_modified => {
                     upsert_to_local.insert(remote_id.clone());
-                },
-                _ => {},
+                }
+                _ => {}
             }
         }
         let mut upsert_to_remote: HashSet<String> = HashSet::new();
@@ -148,17 +151,17 @@ pub async fn actually_sync_databases_mysql(
             match all_remote_books.get(&local_id) {
                 None => {
                     upsert_to_remote.insert(local_id);
-                },
+                }
                 Some(remote_modified) if local_modified > *remote_modified => {
                     upsert_to_remote.insert(local_id);
-                },
-                _ => {},
+                }
+                _ => {}
             }
         }
         if !upsert_to_local.is_empty() {
             // TODO: query all fields from remote books that are slated to be upserted in local db
             let mut query_builder = sqlx::QueryBuilder::new(
-                "SELECT id, name, modified, icon, icon_color, trash FROM books WHERE id IN ("
+                "SELECT id, name, modified, icon, icon_color, trash FROM books WHERE id IN (",
             );
             let mut sep = query_builder.separated(", ");
             for id in upsert_to_local.into_iter() {
@@ -173,7 +176,7 @@ pub async fn actually_sync_databases_mysql(
                 .map_err(|e| e.to_string())?;
 
             let mut query_builder = sqlx::QueryBuilder::new(
-                "INSERT INTO books (id, name, modified, icon, icon_color, trash) "
+                "INSERT INTO books (id, name, modified, icon, icon_color, trash) ",
             );
             query_builder.push_values(books, |mut sep, row| {
                 sep.push_bind(row.id)
@@ -186,12 +189,16 @@ pub async fn actually_sync_databases_mysql(
             });
             query_builder.push(" ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, modified = EXCLUDED.modified, icon = EXCLUDED.icon, icon_color = EXCLUDED.icon_color, trash = EXCLUDED.trash");
 
-            query_builder.build().execute(local_conn).await.map_err(|e| e.to_string())?;
+            query_builder
+                .build()
+                .execute(local_conn)
+                .await
+                .map_err(|e| e.to_string())?;
         }
         if !upsert_to_remote.is_empty() {
             // TODO: query all fields from local books that are slated to be upserted in remote db
             let mut query_builder = sqlx::QueryBuilder::new(
-                "SELECT id, name, modified, icon, icon_color, trash FROM books WHERE id IN ("
+                "SELECT id, name, modified, icon, icon_color, trash FROM books WHERE id IN (",
             );
             let mut sep = query_builder.separated(", ");
             for id in upsert_to_remote.into_iter() {
@@ -206,7 +213,7 @@ pub async fn actually_sync_databases_mysql(
                 .map_err(|e| e.to_string())?;
 
             let mut query_builder = sqlx::QueryBuilder::new(
-                "INSERT INTO books (id, name, modified, icon, icon_color, trash) "
+                "INSERT INTO books (id, name, modified, icon, icon_color, trash) ",
             );
             query_builder.push_values(books, |mut sep, row| {
                 sep.push_bind(row.id)
@@ -224,7 +231,11 @@ pub async fn actually_sync_databases_mysql(
             // query_builder.push(" ON CONFLICT (id) DO UPDATE SET name = new.name, modified = new.modified, icon = new.icon, icon_color = new.icon_color, trash = new.trash");
             query_builder.push(" AS new ON DUPLICATE KEY UPDATE name = new.name, modified = new.modified, icon = new.icon, icon_color = new.icon_color, trash = new.trash");
 
-            query_builder.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
+            query_builder
+                .build()
+                .execute(remote_conn)
+                .await
+                .map_err(|e| e.to_string())?;
         }
     }
 
@@ -232,14 +243,14 @@ pub async fn actually_sync_databases_mysql(
         // NOTE: Sync Existing Documents ///////////////////////////////
         let all_local_documents: Vec<IdAndModified> =
             sqlx::query_as("SELECT id, modified FROM documents")
-            .fetch_all(local_conn)
-            .await
-            .map_err(|e| e.to_string())?;
+                .fetch_all(local_conn)
+                .await
+                .map_err(|e| e.to_string())?;
         let all_remote_documents: Vec<IdAndModified> =
             sqlx::query_as("SELECT id, modified FROM documents")
-            .fetch_all(remote_conn)
-            .await
-            .map_err(|e| e.to_string())?;
+                .fetch_all(remote_conn)
+                .await
+                .map_err(|e| e.to_string())?;
         let all_local_documents: HashMap<String, DateTime<Utc>> = all_local_documents
             .into_iter()
             .map(|kv| (kv.id, kv.modified))
@@ -253,11 +264,11 @@ pub async fn actually_sync_databases_mysql(
             match all_local_documents.get(remote_id) {
                 None => {
                     upsert_to_local.insert(remote_id.clone());
-                },
+                }
                 Some(local_modified) if remote_modified > local_modified => {
                     upsert_to_local.insert(remote_id.clone());
-                },
-                _ => {},
+                }
+                _ => {}
             }
         }
         let mut upsert_to_remote: HashSet<String> = HashSet::new();
@@ -265,11 +276,11 @@ pub async fn actually_sync_databases_mysql(
             match all_remote_documents.get(&local_id) {
                 None => {
                     upsert_to_remote.insert(local_id);
-                },
+                }
                 Some(remote_modified) if local_modified > *remote_modified => {
                     upsert_to_remote.insert(local_id);
-                },
-                _ => {},
+                }
+                _ => {}
             }
         }
         if !upsert_to_local.is_empty() {
@@ -305,7 +316,11 @@ pub async fn actually_sync_databases_mysql(
             });
             query_builder.push(" ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, book = EXCLUDED.book, modified = EXCLUDED.modified, content = EXCLUDED.content, syntax = EXCLUDED.syntax, icon = EXCLUDED.icon, icon_color = EXCLUDED.icon_color");
 
-            query_builder.build().execute(local_conn).await.map_err(|e| e.to_string())?;
+            query_builder
+                .build()
+                .execute(local_conn)
+                .await
+                .map_err(|e| e.to_string())?;
         }
         if !upsert_to_remote.is_empty() {
             // TODO: query all fields from local documents that are slated to be upserted in remote db
@@ -345,7 +360,11 @@ pub async fn actually_sync_databases_mysql(
             // query_builder.push(" ON CONFLICT (id) DO UPDATE SET name = new.name, book = new.book, modified = new.modified, content = new.content, syntax = new.syntax, icon = new.icon, icon_color = new.icon_color");
             query_builder.push(" AS new ON DUPLICATE KEY UPDATE name = new.name, book = new.book, modified = new.modified, content = new.content, syntax = new.syntax, icon = new.icon, icon_color = new.icon_color");
 
-            query_builder.build().execute(remote_conn).await.map_err(|e| e.to_string())?;
+            query_builder
+                .build()
+                .execute(remote_conn)
+                .await
+                .map_err(|e| e.to_string())?;
         }
     }
 

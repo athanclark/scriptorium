@@ -95,11 +95,11 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument, toBook, edi
 
   function changeDocumentIcon(newDocumentIcon: string) {
     setIcon(newDocumentIcon);
-    onUpdateDocument();
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
         await db.execute("UPDATE documents SET icon = $2 WHERE id = $1", [doc, newDocumentIcon]);
+        onUpdateDocument();
       } catch(e) {
         console.error("Updating Document Failed", e);
       }
@@ -109,11 +109,11 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument, toBook, edi
 
   function changeDocumentIconColor(newDocumentIconColor: string) {
     setIconColor(newDocumentIconColor);
-    onUpdateDocument();
     async function go() {
       try {
         const db = await Database.load(__LOCAL_DB);
         await db.execute("UPDATE documents SET icon_color = $2 WHERE id = $1", [doc, newDocumentIconColor]);
+        onUpdateDocument();
       } catch(e) {
         console.error("Updating Document Failed", e);
       }
@@ -212,8 +212,9 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument, toBook, edi
           data={data}
           onEmojiSelect={(emoji: { native: string }) => {
             changeDocumentIcon(emoji.native);
-            closeEmojiPicker();
+            // closeEmojiPicker();
           }} />
+        <TextInput value={icon} placeholder="No Icon" onChange={e => changeDocumentIcon(e.currentTarget.value)} label="Current Icon" />
       </Modal>
       <Stack>
         <TextInput
@@ -249,7 +250,13 @@ function Document({ doc, reload, onUpdateDocument, onDeleteDocument, toBook, edi
                     <Button fullWidth variant="default" onClick={openEmojiPicker} leftSection={<span>{icon}</span>}>Change Icon</Button>
                   </Grid.Col>
                   <Grid.Col span={{base: 12, md: 6, lg: 3}}>
-                    <ColorInput styles={_theme => ({input: {textAlign: "center"}})} swatches={swatches} value={iconColor || ""} onChangeEnd={(c) => changeDocumentIconColor(c)} />
+                    <ColorInput
+                      placeholder="Change Icon Background"
+                      styles={_theme => ({input: {textAlign: "center"}})}
+                      swatches={swatches}
+                      value={iconColor || ""}
+                      onChange={(c) => changeDocumentIconColor(c)}
+                      />
                   </Grid.Col>
                   <Grid.Col span={{base: 12, md: 6, lg: 3}}>
                     <Button fullWidth variant="default" onClick={openMoveDocument}>Move Document</Button>

@@ -1,6 +1,7 @@
 // Copyright (C) 2025  Athan Clark
 import { useState, useMemo, useRef, useEffect, useDeferredValue, startTransition } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { exists } from "@tauri-apps/plugin-fs";
 import { NativeSelect, Typography, Tabs, Grid } from "@mantine/core";
 import { useColorScheme } from "@mantine/hooks";
 import { IconEdit, IconEye } from "@tabler/icons-react";
@@ -155,16 +156,16 @@ type ViewProps = {
 
 function View({ value, syntax }: ViewProps) {
   const [html, setHtml] = useState("");
+  const [rewrittenHtml, setRewrittenHtml] = useState("");
 
   useEffect(() => {
     async function go() {
       try {
         if (syntax !== "html") {
-          console.log("sending raw", value, syntax);
-
           const newHtml: string = await invoke(`render_${syntax}`, { value: value });
-          console.log("received html", newHtml);
           setHtml(newHtml);
+        } else {
+          setHtml(value);
         }
       } catch(e) {
         console.warn("failed to render", e);
@@ -173,10 +174,45 @@ function View({ value, syntax }: ViewProps) {
     go();
   }, [value]);
 
-  const renderedValue = (syntax === "md" || syntax === "adoc")
-    ? (<div dangerouslySetInnerHTML={{ __html: html }} />)
-    : syntax === "html"
-    ? (<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(value) }} />)
+  useEffect(() => {
+    const clean = DOMPurify.sanitize(html);
+    const tmp = document.createElement("div");
+    tmp.innerHTML = clean;
+    function isLocal(s) {
+      return s &&
+        !/^https?:|^data:|^tauri:|^asset:/.test(s) &&
+        (s.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(s) || s.startsWith("file://"));
+    }
+
+    tmp.querySelectorAll("img,source,video,audio").forEach(el => {
+      const src = el.getAttribute("src");
+      if (src && isLocal(src)) {
+        const rawSrc = src.replace(/^file:\/\//, "");
+        async function go() {
+          try {
+            if (await exists(rawSrc)) {
+              el.setAttribute("src", convertFileSrc(rawSrc));
+            } else {
+              el.setAttribute("src", "");
+              el.dataset.src = rawSrc;
+              el.dataset.notFound = true;
+            }
+          } catch(e) {
+            console.warn("error thrown when checking if file exists", e);
+            el.setAttribute("src", "");
+            el.dataset.src = rawSrc;
+            el.dataset.error = e;
+            el.parentElement.dataset.error = e;
+          }
+          setRewrittenHtml(tmp.innerHTML);
+        }
+        go();
+      }
+    });
+  }, [html])
+
+  const renderedValue = (syntax === "md" || syntax === "adoc" || syntax === "html")
+    ? (<div dangerouslySetInnerHTML={{ __html: rewrittenHtml }} />)
     : (<span>Editor Type Not Supported</span>);
   return (
     <Typography>
@@ -187,35 +223,35 @@ function View({ value, syntax }: ViewProps) {
   );
 }
 
-function toTauriImgSrc(src?: string) {
-  if (!src) return src;
-
-  // Handle Unix absolute paths, Windows absolute paths, and file:// URLs
-  const isUnixAbs = src.startsWith('/');
-  const isWinAbs = /^[a-zA-Z]:[\\/]/.test(src);
-  const isFileUrl = src.startsWith('file://');
-
-  if (isUnixAbs || isWinAbs || isFileUrl) {
-    // strip file:// for convertFileSrc
-    const path = isFileUrl ? src.replace(/^file:\/\//, '') : src;
-    try {
-      return convertFileSrc(path);
-    } catch {
-      // In non‑Tauri environments, fall back to original
-      return src;
-    }
-  }
-
-  // Leave http(s), data:, blob:, and relative app assets alone
-  return src;
-}
-
-// FIXME: I should scan the resulting HTML code and apply `toTauriImgSrc` to each `src` field
-// @ts-ignore
-const Img: React.FC<JSX.IntrinsicElements['img']> = (props) => {
-  const { src, ...rest } = props;
-  return <img src={toTauriImgSrc(src)} {...rest} />;
-};
+// function toTauriImgSrc(src?: string) {
+//   if (!src) return src;
+//
+//   // Handle Unix absolute paths, Windows absolute paths, and file:// URLs
+//   const isUnixAbs = src.startsWith('/');
+//   const isWinAbs = /^[a-zA-Z]:[\\/]/.test(src);
+//   const isFileUrl = src.startsWith('file://');
+//
+//   if (isUnixAbs || isWinAbs || isFileUrl) {
+//     // strip file:// for convertFileSrc
+//     const path = isFileUrl ? src.replace(/^file:\/\//, '') : src;
+//     try {
+//       return convertFileSrc(path);
+//     } catch {
+//       // In non‑Tauri environments, fall back to original
+//       return src;
+//     }
+//   }
+//
+//   // Leave http(s), data:, blob:, and relative app assets alone
+//   return src;
+// }
+//
+// // FIXME: I should scan the resulting HTML code and apply `toTauriImgSrc` to each `src` field
+// // @ts-ignore
+// const Img: React.FC<JSX.IntrinsicElements['img']> = (props) => {
+//   const { src, ...rest } = props;
+//   return <img src={toTauriImgSrc(src)} {...rest} />;
+// };
 
 function MathJaxBlock({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);

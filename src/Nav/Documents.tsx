@@ -173,6 +173,10 @@ function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax, sele
     go();
   }
 
+  const bg = bookIconColor ? `linear-gradient(45deg, ${bookIconColor}, ${otherColor(bookIconColor)})` : "";
+  const iconStyles = bookIconColor ? { ...iconBackgroundStyles, background: bg} : {};
+  const icon = bookIcon ? (<span style={iconStyles}>{bookIcon}</span>) : null;
+
   return (
     <>
       <Modal opened={openedTrashBook} onClose={closeTrashBook} title="Throw Away This Book?">
@@ -195,6 +199,7 @@ function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax, sele
       <Stack>
         <Anchor href="#" onClick={goBack}><IconArrowLeft size={12} /> All Books</Anchor>
         <TextInput
+          leftSection={icon}
           placeholder="Click to Edit"
           className={"book-name"}
           variant="unstyled"
@@ -204,6 +209,7 @@ function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax, sele
               fontSize: "1.5rem",
               fontStyle: bookName ? "inherit" : "italic",
               color: bookName ? "inherit" : "var(--mantine-color-dimmed0)",
+              marginLeft: "0.5rem",
             }
           })}
           value={bookName}
@@ -229,7 +235,13 @@ function Documents({ book, onSelectDocument, goBack, reload, defaultSyntax, sele
               <Accordion.Panel>
                 <Stack>
                   <Button fullWidth variant="default" onClick={openEmojiPicker} leftSection={<span>{bookIcon}</span>}>Change Icon</Button>
-                  <ColorInput styles={_theme => ({input: {textAlign: "center"}})} swatches={swatches} value={bookIconColor || ""} onChangeEnd={(c) => changeBookIconColor(c)} />
+                  <ColorInput
+                    placeholder="Change Icon Background"
+                    styles={_theme => ({input: {textAlign: "center"}})}
+                    swatches={swatches}
+                    value={bookIconColor || ""}
+                    onChange={(c) => changeBookIconColor(c)}
+                    />
                   {
                     !(book === "trash") && (
                       bookTrash

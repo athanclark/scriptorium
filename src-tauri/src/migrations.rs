@@ -1,6 +1,6 @@
 // Copyright (C) 2025  Athan Clark
 use lazy_static::lazy_static;
-use tauri_plugin_sql::{Migration, MigrationKind, MigrationList, DbInstances, DbPool};
+use tauri_plugin_sql::{DbInstances, DbPool, Migration, MigrationKind, MigrationList};
 
 lazy_static! {
     pub static ref SQLITE_MIGRATIONS: MigrationList = MigrationList(vec![
@@ -291,4 +291,3 @@ ALTER TABLE documents ALTER COLUMN modified TYPE TIMESTAMPTZ;
         },
     ]);
 }
-
