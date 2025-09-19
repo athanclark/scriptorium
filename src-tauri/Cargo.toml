@@ -30,6 +30,6 @@ log = "0.4.27"
 env_logger = "0.11.8"
 chrono = "0.4.41"
 pulldown-cmark = "0.13.0"
-asciidocr = { git = "https://github.com/athanclark/asciidocr.git", rev = "162a0ec45b67ec361ddcfc7c86234f49943070d7" }
+asciidocr = "0.1.11"
 tauri-plugin-fs = "2"
 

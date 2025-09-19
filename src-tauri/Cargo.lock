@@ -120,8 +120,9 @@ checksum = "b0674a1ddeecb70197781e945de4b3b8ffb61fa939a5597bcf48503737663100"
 
 [[package]]
 name = "asciidocr"
-version = "0.1.9"
-source = "git+https://github.com/athanclark/asciidocr.git?rev=162a0ec45b67ec361ddcfc7c86234f49943070d7#162a0ec45b67ec361ddcfc7c86234f49943070d7"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a03a4972bb07d3062d304fd49322d9e1d0adc005a03a8456866ed2ab3027e121"
 dependencies = [
  "anyhow",
  "clap",
