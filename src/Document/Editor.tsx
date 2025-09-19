@@ -184,7 +184,7 @@ function View({ value, syntax }: ViewProps) {
         (s.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(s) || s.startsWith("file://"));
     }
 
-    const promises = [];
+    const promises: Promise<void>[] = [];
 
     tmp.querySelectorAll("img,source,video,audio").forEach(el => {
       const src = el.getAttribute("src");
